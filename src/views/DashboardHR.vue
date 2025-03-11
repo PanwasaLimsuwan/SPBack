@@ -2,7 +2,7 @@
   <div class="DashboardHR">
     <header class="header">
       <img src="logo.png" alt="Sony Logo" class="logo" />
-      <div class="filters">
+      <!-- <div class="filters">
         <select>
           <option>Division : ALL</option>
         </select>
@@ -19,6 +19,43 @@
           <option>Process : ALL</option>
         </select>
         <input type="text" placeholder="Search" />
+      </div> -->
+      <div class="filters">
+        <select v-model="selectedDivision" @change="applyFilters">
+          <option value="ALL">Division : ALL</option>
+          <option value="ISM">ISM</option>
+          <option value="DDM">DDM</option>
+          <option value="LDM">LDM</option>
+        </select>
+        <select v-model="selectedDepartment" @change="applyFilters">
+          <option value="ALL">Department : ALL</option>
+          <option value="MF1">MF1</option>
+          <option value="MF2">MF2</option>
+        </select>
+        <select v-model="selectedSection" @change="applyFilters">
+          <option value="ALL">Section : ALL</option>
+          <option value="ASSY Section">ASSY Section</option>
+          <option value="TEST Section">TEST Section</option>
+        </select>
+        <select v-model="selectedBiz" @change="applyFilters">
+          <option value="ALL">Biz : ALL</option>
+          <option value="IS">IS</option>
+          <option value="HTPS">HTPS</option>
+          <option value="MOLED">MOLED</option>
+        </select>
+        <select v-model="selectedProcess" @change="applyFilters">
+          <option value="ALL">Process : ALL</option>
+          <option value="ASSY">ASSY</option>
+          <option value="MOKU">MOKU</option>
+          <option value="CSAT">CSAT</option>
+          <option value="JUNB">JUNB</option>
+        </select>
+        <input
+          type="text"
+          placeholder="Search"
+          v-model="searchQuery"
+          @input="applyFilters"
+        />
       </div>
     </header>
 
@@ -55,7 +92,15 @@
         <button @click="resetFilters">
           <img src="refresh.png" alt="Refresh" class="refresh-icon" />
         </button>
-        <PieChart :data="pieChartData" @filter="filterEmployeesByStatus" />
+        <!-- <PieChart :data="pieChartData" @filter="filterEmployeesByStatus" /> -->
+        <!-- <PieChart
+          :data="getPieChartData(filteredEmployees)"
+          @filter="filterEmployeesByStatus"
+        /> -->
+        <PieChart
+          :data="getPieChartData(filteredEmployees)"
+          @filter="filterEmployeesByStatus"
+        />
       </div>
       <div class="table">
         <EmployeeTable
@@ -63,6 +108,7 @@
             filteredEmployees.length > 0 ? filteredEmployees : sortedEmployees
           "
         />
+        <!-- <EmployeeTable :employees="sortedFilteredEmployees" /> -->
       </div>
     </section>
 
@@ -70,8 +116,13 @@
     <section class="charts">
       <div class="table">
         <!-- ตารางพนักงานไม่ถูกฟิลเตอร์ -->
-        <EmployeeSkillTable
+        <!-- <EmployeeSkillTable
           :employees="employees"
+          :skills="skills"
+          @selectEmployee="selectEmployee"
+        /> -->
+        <EmployeeSkillTable
+          :employees="filteredEmployees"
           :skills="skills"
           @selectEmployee="selectEmployee"
         />
@@ -91,10 +142,24 @@
         <button @click="resetFilters">
           <img src="refresh.png" alt="Refresh" class="refresh-icon" />
         </button>
+        <!-- <fullySkilledPieChart
+          :data="updatedfullySkilled(filteredEmployees)"
+          @filter="filterEmployeesBySkill"
+        /> -->
+
+        <!-- <fullySkilledPieChart
+          :data="getFullySkilledData(filteredEmployees)"
+          @filter="filterEmployeesBySkill"
+        /> -->
         <fullySkilledPieChart
+  :data="getFullySkilledData(filteredEmployees)"
+  @filterBySkill="filterEmployeeฺsBySkill"
+/>
+
+        <!-- <fullySkilledPieChart
           :data="fullySkilled"
-          @filter="filterEmployeesBySkill2"
-        />
+          @filter="filterEmployeesBySkill"
+        /> -->
       </div>
       <div class="table">
         <EmployeeSkillTable
@@ -206,11 +271,11 @@
       </div>
     </section>
 
-    <section class="charts">
+    <!-- <section class="charts">
       <div class="chart">
         <MonthlyWorkedTimeOverload :data="monthlyWorkTimeOverload" />
       </div>
-    </section>
+    </section> -->
 
     <section class="charts">
       <div class="chart">
@@ -232,7 +297,7 @@ import HeadcountByDivision from "./../components/HeadcountByDivision.vue";
 import HeadcountByBiz from "./../components/HeadcountByBiz.vue";
 import HeadcountByWorkGroup from "./../components/HeadcountByWorkGroup.vue";
 import HeadcounTransition from "./../components/HeadcounTransition.vue";
-import MonthlyWorkedTimeOverload from "./../components/MonthlyWorkedTimeOverload.vue";
+// import MonthlyWorkedTimeOverload from "./../components/MonthlyWorkedTimeOverload.vue";
 import MonthlyWorkTime from "./../components/MonthlyWorkTime.vue";
 import MonthlyAbsentTrend from "./../components/MonthlyAbsentTrend.vue";
 import MonthlyEmployeeExitRate from "./../components/MonthlyEmployeeExitRate.vue";
@@ -251,7 +316,7 @@ export default {
     HeadcountByBiz,
     HeadcountByWorkGroup,
     HeadcounTransition,
-    MonthlyWorkedTimeOverload,
+    // MonthlyWorkedTimeOverload,
     MonthlyWorkTime,
     MonthlyAbsentTrend,
     MonthlyEmployeeExitRate,
@@ -259,6 +324,13 @@ export default {
   },
   data() {
     return {
+      electedDivision: "ALL",
+      selectedDepartment: "ALL",
+      selectedSection: "ALL",
+      selectedBiz: "ALL",
+      selectedProcess: "ALL",
+      searchQuery: "",
+
       stats: [
         {
           value: "7:15",
@@ -284,8 +356,8 @@ export default {
       ],
 
       pieChartData: {
-        values: [85, 33, 5],
-        labels: ["In Cleanroom", "Out Cleanroom", "ขาดงาน"],
+        values: [5, 33, 85],
+        labels: ["ขาดงาน", "Out Cleanroom", "In Cleanroom"],
         type: "pie",
       },
       employees: [
@@ -298,6 +370,7 @@ export default {
           WorkGroup: "FTE",
           Division: "ISM",
           Department: "MF2",
+          Section: "ASSY Section",
           Biz: "IS",
           Process: "ASSY",
           CourseGroup: "Injection",
@@ -319,6 +392,7 @@ export default {
           WorkGroup: "FTE",
           Division: "ISM",
           Department: "MF1",
+          Section: "TEST Section",
           Biz: "HTPS",
           Process: "CSAT",
           CourseGroup: "OJT",
@@ -340,6 +414,7 @@ export default {
           WorkGroup: "FTE",
           Division: "ISM",
           Department: "MF2",
+          Section: "TEST Section",
           Biz: "MOLED",
           Process: "JUNB",
           CourseGroup: "OJT",
@@ -527,6 +602,7 @@ export default {
       fullySkilled: {
         values: [80, 20],
         labels: ["Fully Skilled", "Need Training"],
+        type: "pie",
       },
       monthlyData: {
         months: ["ASSY", "MOKU", "CSAT", "JUNB"],
@@ -557,6 +633,205 @@ export default {
     };
   },
   methods: {
+    applyFilters() {
+      this.filteredEmployees = this.sortEmployeesByStatus(
+        this.employees.filter((employee) => {
+          const matchesDivision =
+            this.selectedDivision === "ALL" ||
+            employee.Division === this.selectedDivision;
+          const matchesDepartment =
+            this.selectedDepartment === "ALL" ||
+            employee.Department === this.selectedDepartment;
+          const matchesSection =
+            this.selectedSection === "ALL" ||
+            employee.Section === this.selectedSection;
+          const matchesBiz =
+            this.selectedBiz === "ALL" || employee.Biz === this.selectedBiz;
+          const matchesProcess =
+            this.selectedProcess === "ALL" ||
+            employee.Process === this.selectedProcess;
+
+          // การค้นหาจาก input
+          const matchesSearch =
+            this.searchQuery.trim() === "" ||
+            `${employee.Firstname} ${employee.Lastname}`
+              .toLowerCase()
+              .includes(this.searchQuery.toLowerCase());
+
+          return (
+            matchesDivision &&
+            matchesDepartment &&
+            matchesSection &&
+            matchesBiz &&
+            matchesProcess &&
+            matchesSearch
+          );
+        })
+      );
+      // // อัปเดต Fully Skilled Pie Chart
+      // this.updateFullySkilledChart();
+    //   // เมื่อมีการฟิลเตอร์ข้อมูลเรียบร้อยแล้ว ให้คำนวณและอัปเดตข้อมูลสำหรับ Fully Skilled Pie Chart
+    // this.updateFullySkilledChart();
+
+      // // อัปเดต Fully Skilled ตามพนักงานที่ถูกกรอง
+      this.filterEmployeesBySkill("Fully Skilled");
+
+      // อัพเดตเวลาและวันที่จริง
+    const currentTime = new Date();
+    this.stats[0].value = currentTime.toLocaleTimeString(); // เวลาปัจจุบัน
+    this.stats[0].subLabel = currentTime.toLocaleDateString('th-TH'); // วันที่ปัจจุบัน
+    
+    // กำหนดค่า shift โดยใช้เวลา
+    this.updateShift(currentTime);
+    },
+
+    // ฟังก์ชันอัพเดตค่า Shift
+  updateShift(currentTime) {
+    // ใช้เวลาปัจจุบันเพื่อกำหนด Shift
+    const hours = currentTime.getHours();
+
+    if (hours >= 7 && hours < 19) {
+      this.stats[0].label = "SHIFT : DAY";  // ถ้าเวลาเป็น 7:00 - 18:59
+    } else {
+      this.stats[0].label = "SHIFT : NIGHT";  // ถ้าเวลาเป็น 19:00 - 6:59
+    }
+  },
+
+    getFullySkilledData(employees) {
+  // กรองพนักงานที่ Fully Skilled (ทุกทักษะต้องเป็นระดับ 3)
+  const fullySkilledCount = employees.filter((employee) =>
+    this.skills.every((skill) => employee[skill] === 3)
+  ).length;
+
+  // กรองพนักงานที่ Need Training (มีระดับทักษะ 0 หรือ 1 มากกว่า 2 ทักษะ)
+  const needTrainingCount = employees.filter((employee) =>
+    this.skills.filter((skill) => employee[skill] === 0 || employee[skill] === 1).length > 2
+  ).length;
+
+  // ถ้าทั้งหมดเป็น 0 ให้กราฟแสดงเป็นสีเทา (ตัวอย่างเช็คแบบง่าย)
+  const isEmpty = fullySkilledCount === 0 && needTrainingCount === 0;
+
+  return {
+    values: isEmpty ? [1] : [fullySkilledCount, needTrainingCount],
+    labels: isEmpty ? ["No Data"] : ["Fully Skilled", "Need Training"],
+    type: "pie",
+    marker: {
+      colors: isEmpty ? ["gray"] : ["green", "red"]
+    }
+  };
+},
+
+updateFullySkilledChart() {
+  // คำนวณข้อมูลสำหรับกราฟ Fully Skilled
+  const fullySkilledData = this.getFullySkilledData(this.filteredFullySkilled);
+  // ส่งข้อมูลใหม่ไปยังกราฟ
+  this.fullySkilled = fullySkilledData;
+},
+
+// ฟังก์ชันอัปเดตข้อมูลในกราฟ
+// updateFullySkilledChart() {
+//       const fullySkilledData = this.getFullySkilledData(this.filteredEmployees);
+//       this.fullySkilled = fullySkilledData; // อัปเดตกราฟด้วยข้อมูลที่กรอง
+//     },
+
+
+    getPieChartData(employees) {
+      const missing = employees.filter(
+        (employee) => employee.Status === "ขาดงาน"
+      ).length;
+      const outCleanroom = employees.filter(
+        (employee) => employee.Status === "Out Cleanroom"
+      ).length;
+      const inCleanroom = employees.filter(
+        (employee) => employee.Status === "In Cleanroom"
+      ).length;
+
+      return {
+        values: [missing, outCleanroom, inCleanroom],
+        labels: ["ขาดงาน", "Out Cleanroom", "In Cleanroom"],
+        type: "pie",
+      };
+    },
+    //     getPieChartData(employees) {
+    //   // คำนวณจำนวนพนักงานในแต่ละระดับทักษะ (Basic, Medium, Expert)
+    //   const basicCount = employees.filter(
+    //     (employee) => this.skills.some((skill) => employee[skill] === 1)
+    //   ).length;
+
+    //   const mediumCount = employees.filter(
+    //     (employee) => this.skills.some((skill) => employee[skill] === 2)
+    //   ).length;
+
+    //   const expertCount = employees.filter(
+    //     (employee) => this.skills.some((skill) => employee[skill] === 3)
+    //   ).length;
+
+    //   // ส่งข้อมูลที่คำนวณได้ไปยังกราฟ
+    //   return {
+    //     values: [basicCount, mediumCount, expertCount],
+    //     labels: ["Basic", "Medium", "Expert"],
+    //     type: "pie",
+    //   };
+    // }
+    // ,
+
+    // updateFullySkilledChart() {
+    //   const totalEmployees = this.filteredFullySkilled.length;
+
+    //   if (totalEmployees === 0) {
+    //     this.fullySkilled = {
+    //       values: [0, 0],
+    //       labels: ["Fully Skilled", "Need Training"],
+    //     };
+    //     return;
+    //   }
+
+    //   const fullySkilledCount = this.filteredEmployees.filter((employee) =>
+    //     this.skills.every((skill) => employee[skill] === 3)
+    //   ).length;
+
+    //   this.fullySkilled = {
+    //     values: [fullySkilledCount, totalEmployees - fullySkilledCount],
+    //     labels: ["Fully Skilled", "Need Training"],
+    //   };
+    // },
+
+    // updateFullySkilledChart() {
+    //   // ตรวจสอบพนักงานที่มีทักษะทั้งหมดระดับ 3 (Expert)
+    //   const fullySkilledCount = this.filteredEmployees.filter(
+    //     (employee) => this.skills.every((skill) => employee[skill] === 3) // ทุกทักษะต้องเป็นระดับ 3 (Expert)
+    //   ).length;
+
+    //   // คำนวณจำนวนพนักงานทั้งหมดที่กรอง
+    //   const totalEmployees = this.filteredEmployees.length;
+
+    //   // ถ้ามีพนักงานที่ผ่านการกรอง
+    //   if (totalEmployees === 0) {
+    //     this.fullySkilled = {
+    //       values: [0, 0],
+    //       labels: ["Fully Skilled", "Need Training"],
+    //     };
+    //     return;
+    //   }
+
+    //   // คำนวณจำนวนพนักงานที่ต้องการการฝึกอบรม
+    //   const needTrainingCount = totalEmployees - fullySkilledCount;
+
+    //   // อัปเดตข้อมูลของกราฟ
+    //   this.fullySkilled = {
+    //     values: [fullySkilledCount, needTrainingCount],
+    //     labels: ["Fully Skilled", "Need Training"],
+    //   };
+
+    //   console.log("Fully Skilled Count:", fullySkilledCount);
+    //   console.log("Need Training Count:", needTrainingCount);
+    // },
+
+  //   updateFullySkilledChart() {
+  //   // ใช้ข้อมูล filteredFullySkilled ในการอัปเดตข้อมูลของ Pie Chart
+  //   this.fullySkilled = this.getFullySkilledData(this.filteredFullySkilled);
+  // },
+
     sortEmployeesByStatus(employees) {
       // ระบุลำดับการจัดเรียงสถานะ
       const statusOrder = ["ขาดงาน", "Out Cleanroom", "In Cleanroom"];
@@ -642,27 +917,55 @@ export default {
           this.skills.some((skill) => employee[skill] === levelValue)
         );
     },
-    filterEmployeesBySkill2(label) {
+    filterEmployeesBySkill(label) {
       if (label === "Fully Skilled") {
         // กรองพนักงานที่มีทุก skill level เท่ากับ 3
-        this.filteredFullySkilled = this.employees.filter((employee) =>
+        this.filteredFullySkilled = this.filteredEmployees.filter((employee) =>
           this.skills.every((skill) => employee[skill] === 3)
         );
       } else if (label === "Need Training") {
         // กรองพนักงานที่มี skill level ใดๆ ต่ำกว่า 3
-        this.filteredFullySkilled = this.employees.filter((employee) => {
-          // นับจำนวนทักษะที่มีระดับ 0 หรือ 1
-          const lowSkillsCount = this.skills.reduce((count, skill) => {
-            return employee[skill] === 0 || employee[skill] === 1
-              ? count + 1
-              : count;
-          }, 0);
+        this.filteredFullySkilled = this.filteredEmployees.filter(
+          (employee) => {
+            // นับจำนวนทักษะที่มีระดับ 0 หรือ 1
+            const lowSkillsCount = this.skills.reduce((count, skill) => {
+              return employee[skill] === 0 || employee[skill] === 1
+                ? count + 1
+                : count;
+            }, 0);
 
-          // เช็คว่ามีระดับทักษะ 0 หรือ 1 มากกว่า 2 ทักษะ
-          return lowSkillsCount > 2;
-        });
+            // เช็คว่ามีระดับทักษะ 0 หรือ 1 มากกว่า 2 ทักษะ
+            return lowSkillsCount > 2;
+          }
+        );
       }
+
+      // รีเฟรชกราฟ
+    this.updateFullySkilledChart();  // อัปเดตกราฟเมื่อกรองข้อมูล
+
+      // // อัปเดตข้อมูลให้ Pie Chart Fully Skilled
+      // this.updateFullySkilledChart();
+
+      // กรองพนักงานตามที่เลือกในกราฟ
+    this.filteredFullySkilled = this.filteredEmployees;
     },
+
+  //   filterEmployeesBySkill(label) {
+  //   if (label === "Fully Skilled") {
+  //     // กรองพนักงานที่ทักษะทั้งหมดเป็น 3
+  //     this.filteredEmployees = this.employees.filter((employee) =>
+  //       this.skills.every((skill) => employee[skill] === 3)
+  //     );
+  //   } else if (label === "Need Training") {
+  //     // กรองพนักงานที่มีทักษะต่ำกว่า 3 มากกว่า 2 ทักษะ
+  //     this.filteredEmployees = this.employees.filter((employee) =>
+  //       this.skills.filter((skill) => employee[skill] === 0 || employee[skill] === 1).length > 2
+  //     );
+  //   }
+
+  //   // รีเฟรชข้อมูลในตารางและกราฟ
+  //   this.updateFullySkilledChart();
+  // },
 
     updateDivisionFilter() {
       if (this.selectedDivision === "ALL") {
@@ -680,26 +983,60 @@ export default {
     //   const selectedSkill = eventData.points[0].x; // Skill ที่เลือกจากแกน X ของกราฟ
     //   this.$emit("filterSkill", selectedSkill); // ส่ง Skill กลับไปยัง App.vue
     // },
+
+    // resetFilters() {
+    //   this.filteredSkillEmployees = this.employees; // รีเซ็ตข้อมูลกลับไปที่ทั้งหมด
+    //   this.filteredFullySkilled = this.employees;
+    //   // this.filteredEmployees = [];
+    //   this.filteredEmployeesDivision = this.sortEmployeesByStatus(
+    //     this.employees
+    //   );
+    //   this.filteredEmployeesBiz = this.sortEmployeesByStatus(this.employees);
+    //   this.filteredEmployeesWorkGroup = this.sortEmployeesByStatus(
+    //     this.employees
+    //   );
+    //   this.filteredEmployees = this.sortEmployeesByStatus(this.employees);
+    //   //     this.filteredEmployees = this.employees;  // รีเซ็ตกลับไปที่ทั้งหมด
+    //   //    this.filteredEmployeesDivision = this.employees;
+    //   //    this.filteredEmployeesBiz = this.employees;
+    //   //    this.filteredEmployeesWorkGroup = this.employees;
+    //   // this.recommendedEmployees = [];
+    //   // this.selectedEmployee = null;
+    //   console.log("Filters reset. Showing all employees.");
+    // },
+
     resetFilters() {
-      this.filteredSkillEmployees = this.employees; // รีเซ็ตข้อมูลกลับไปที่ทั้งหมด
-      this.filteredFullySkilled = this.employees;
-      // this.filteredEmployees = [];
-      this.filteredEmployeesDivision = this.sortEmployeesByStatus(
-        this.employees
+      console.log("Refreshing charts with filtered data...");
+
+      // รีเซ็ตค่าพนักงานที่ถูกคัดกรองใหม่ โดยไม่ล้างการกรอง
+      this.filteredEmployees = this.sortEmployeesByStatus(
+        this.employees.filter((employee) => {
+          const matchesDivision =
+            this.selectedDivision === "ALL" ||
+            employee.Division === this.selectedDivision;
+          const matchesDepartment =
+            this.selectedDepartment === "ALL" ||
+            employee.Department === this.selectedDepartment;
+          const matchesSection =
+            this.selectedSection === "ALL" ||
+            employee.Section === this.selectedSection;
+
+          return matchesDivision && matchesDepartment && matchesSection;
+        })
       );
-      this.filteredEmployeesBiz = this.sortEmployeesByStatus(this.employees);
-      this.filteredEmployeesWorkGroup = this.sortEmployeesByStatus(
-        this.employees
-      );
-      this.filteredEmployees = this.sortEmployeesByStatus(this.employees);
-      //     this.filteredEmployees = this.employees;  // รีเซ็ตกลับไปที่ทั้งหมด
-      //    this.filteredEmployeesDivision = this.employees;
-      //    this.filteredEmployeesBiz = this.employees;
-      //    this.filteredEmployeesWorkGroup = this.employees;
-      // this.recommendedEmployees = [];
-      // this.selectedEmployee = null;
-      console.log("Filters reset. Showing all employees.");
+
+      // รีเฟรช Fully Skilled Pie Chart โดยใช้ข้อมูลที่ถูกกรอง
+      // this.filterEmployeesBySkill("Fully Skilled");
+
+      // อัปเดต Fully Skilled Pie Chart
+      this.updateFullySkilledChart();
+
+      // รีเฟรชตาราง
+    this.filteredFullySkilled = this.filteredEmployees;
+
+      console.log("Updated filteredEmployees:", this.filteredEmployees);
     },
+
     selectEmployee(employee) {
       this.selectedEmployee = employee; // ตั้งค่าพนักงานที่ถูกเลือก
       console.log("Selected Employee:", employee);
@@ -734,6 +1071,8 @@ export default {
     );
     this.filteredFullySkilled = this.employees;
     this.filteredEmployees = this.sortEmployeesByStatus(this.employees);
+  
+    this.applyFilters();
   },
 };
 </script>

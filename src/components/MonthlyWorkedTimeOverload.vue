@@ -9,7 +9,7 @@ export default {
   name: "MonthlyWorkedTimeOverload",
   props: {
     data: {
-      type: Object,
+      type: Array, // รับ employees ตรง ๆ ไม่ใช่ Object
       required: true,
     },
   },
@@ -24,22 +24,34 @@ export default {
       },
     },
   },
+  computed: {
+    processedData() {
+      // โครงสร้างของข้อมูล Process
+      let processNames = ["ASSY", "MOKU", "CSAT", "JUNB"];
+      let workedTimeOverload = [0, 0, 0, 0]; // เริ่มต้นที่ 0
+
+      // คำนวณ WorkTime รวมของแต่ละ Process
+      this.data.forEach(emp => {
+        let index = processNames.indexOf(emp.Process);
+        if (index !== -1) {
+          workedTimeOverload[index] += emp.WorkTime || 0;
+        }
+      });
+
+      return { processNames, workedTimeOverload };
+    },
+  },
   methods: {
     drawChart() {
-      const { months, workedTimeOverload } = this.data;
+      const { processNames, workedTimeOverload } = this.processedData;
 
       const chartData = [
         {
-          x: months,
+          x: processNames,
           y: workedTimeOverload,
-          type: "scatter",
-          mode: "lines+markers",
+          type: "bar",
           marker: {
-            color: "red",
-            size: 8,
-          },
-          line: {
-            color: "red",
+            color: workedTimeOverload.map(hours => (hours > 60 ? "red" : "green")),
           },
         },
       ];
@@ -47,15 +59,13 @@ export default {
       const layout = {
         title: "Monthly Worked Time Overload",
         xaxis: {
-          title: "Months",
+          title: "Process",
         },
         yaxis: {
-          title: "Overload Hours",
+          title: "Worked Hours",
+          range: [0, Math.max(...workedTimeOverload) + 10],
         },
         height: 400,
-        // width: 800,
-        paper_bgcolor: "rgba(0,0,0,0)",
-        // plot_bgcolor: "rgba(0,0,0,0)",
         responsive: true,
       };
 

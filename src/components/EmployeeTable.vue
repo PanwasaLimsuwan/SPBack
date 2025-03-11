@@ -53,16 +53,16 @@ export default {
   methods: {
     getStatusClass(status) {
       return {
-        "status-in-cleanroom": status === "In Cleanroom",
-        "status-out-cleanroom": status === "Out Cleanroom",
         "status-missing": status === "ขาดงาน",
+        "status-out-cleanroom": status === "Out Cleanroom",
+        "status-in-cleanroom": status === "In Cleanroom",
       };
     },
     getDivisionClass(division) {
   return {
     "division-ism": division === "ISM",
-    "division-rnd": division === "RND",
-    "division-qa": division === "QA",
+    "division-ddm": division === "DDM",
+    "division-ldm": division === "LDM",
     "division-default": !division, // ใช้ default class ถ้าไม่มีค่า
   };
 },

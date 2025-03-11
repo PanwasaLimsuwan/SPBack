@@ -5,7 +5,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ลงทะเบียน ApplicationDbContext โดยใช้ SQL Server (หรือฐานข้อมูลที่คุณใช้งาน)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+    sqlOptions => sqlOptions.EnableRetryOnFailure()) // เพิ่มการลองเชื่อมต่อใหม่ที่นี่
+);
 
 // Add services to the container.
 builder.Services.AddControllers();

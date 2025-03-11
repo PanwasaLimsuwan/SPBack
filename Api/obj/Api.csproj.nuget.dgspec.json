@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\JecII\\SPBack\\api\\Api.csproj": {}
+    "C:\\JecII\\SPBack\\Api\\Api.csproj": {}
   },
   "projects": {
-    "C:\\JecII\\SPBack\\api\\Api.csproj": {
+    "C:\\JecII\\SPBack\\Api\\Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\JecII\\SPBack\\api\\Api.csproj",
+        "projectUniqueName": "C:\\JecII\\SPBack\\Api\\Api.csproj",
         "projectName": "Api",
-        "projectPath": "C:\\JecII\\SPBack\\api\\Api.csproj",
+        "projectPath": "C:\\JecII\\SPBack\\Api\\Api.csproj",
         "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-        "outputPath": "C:\\JecII\\SPBack\\api\\obj\\",
+        "outputPath": "C:\\JecII\\SPBack\\Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -273,3 +273,9 @@ C:\JecII\SPBack\Api\obj\Debug\net8.0\refint\Api.dll
 C:\JecII\SPBack\Api\obj\Debug\net8.0\Api.pdb
 C:\JecII\SPBack\Api\obj\Debug\net8.0\Api.genruntimeconfig.cache
 C:\JecII\SPBack\Api\obj\Debug\net8.0\ref\Api.dll
+C:\JecII\SPBack\Api\bin\Debug\net8.0\System.Data.SqlClient.dll
+C:\JecII\SPBack\Api\bin\Debug\net8.0\runtimes\win-arm64\native\sni.dll
+C:\JecII\SPBack\Api\bin\Debug\net8.0\runtimes\win-x64\native\sni.dll
+C:\JecII\SPBack\Api\bin\Debug\net8.0\runtimes\win-x86\native\sni.dll
+C:\JecII\SPBack\Api\bin\Debug\net8.0\runtimes\unix\lib\net8.0\System.Data.SqlClient.dll
+C:\JecII\SPBack\Api\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.Data.SqlClient.dll

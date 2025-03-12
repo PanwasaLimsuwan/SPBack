@@ -7,21 +7,35 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add services to the container.
+// ตั้งค่า CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", builder =>
+    {
+        builder.WithOrigins("http://localhost:8080")  // URL ของ Frontend
+               .AllowAnyMethod()                    // อนุญาตทุก HTTP method
+               .AllowAnyHeader();                   // อนุญาตทุก header
+    });
+});
+
+// เพิ่มบริการที่จำเป็น
 builder.Services.AddControllers();
 
-// Add Swagger
+// เพิ่ม Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Enable Swagger middleware if in Development
+// เปิดใช้งาน Swagger UI เมื่อใน Development Environment
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger(); // Add this line to enable Swagger
-    app.UseSwaggerUI(); // Add this line to enable Swagger UI
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+// เปิดใช้งาน CORS
+app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 app.MapControllers();

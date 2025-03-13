@@ -50,10 +50,10 @@ namespace Api.Controllers
                         {
                             var result = new
                             {
-                                empID = reader["EmpID"],
+                                
                                 firstname = reader["Firstname"],
                                 lastname = reader["Lastname"],
-                                hours = reader["TotalWorkedHours"]
+                                workTime = reader["TotalWorkedHours"]
                             };
                             resultList.Add(result);
                         }

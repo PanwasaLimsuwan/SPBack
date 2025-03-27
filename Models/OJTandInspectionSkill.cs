@@ -13,6 +13,8 @@ public class OJTandInspectionSkill
     public string CerNo { get; set; }
     public int? Active { get; set; }
     public string SkillGroup { get; set; }
-    public string EmpID { get; set; }
+    public ManpowerReq ManpowerReq { get; set; }
+    public int EmpID { get; set; }
+    public EmployeeInfo EmployeeInfo { get; set; }
 }
 }

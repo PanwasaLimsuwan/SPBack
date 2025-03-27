@@ -22,8 +22,8 @@ namespace Api.Controllers
         public async Task<IActionResult> GetOJTandInspectionSkills()
         {
             var combinedData = await (from employee in _context.EmployeeInfo
-                                      join skill in _context.OJTandInspectionSkill
-                                      on employee.EmpID.ToString() equals skill.EmpID
+                                    //   join skill in _context.OJTandInspectionSkill
+                                    //   on employee.EmpID.ToString() equals skill.EmpID
                                       select new 
                                       {
                                           EmpID = employee.EmpID,
@@ -33,12 +33,12 @@ namespace Api.Controllers
                                           Department = employee.Department,
                                           Position = employee.Position,
                                           Email = employee.Email,
-                                          CourseNo = skill.CourseNo,
-                                          CourseGroup = skill.CourseGroup,
-                                          Biz = skill.Biz,
-                                          Process = skill.Process,
-                                          SkillGroup = skill.SkillGroup,
-                                          Active = skill.Active
+                                        //   CourseNo = skill.CourseNo,
+                                        //   CourseGroup = skill.CourseGroup,
+                                        //   Biz = skill.Biz,
+                                        //   Process = skill.Process,
+                                        //   SkillGroup = skill.SkillGroup,
+                                        //   Active = skill.Active
                                       }).ToListAsync();
 
             return Ok(combinedData);

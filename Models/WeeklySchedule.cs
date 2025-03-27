@@ -13,5 +13,7 @@ public class WeeklySchedule
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public int? AbsentCount { get; set; }
+
+    public ICollection<EICC_Control> EICC_Control { get; set; }
 }
 }

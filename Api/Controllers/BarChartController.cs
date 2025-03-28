@@ -23,14 +23,13 @@ namespace Api.Controllers
         {
             string connectionString = _configuration.GetConnectionString("DefaultConnection");
 
-            // SQL Query ที่ใช้ดึงข้อมูลจากฐานข้อมูล "ManpowerReg"
+            // SQL Query ที่ใช้ดึงข้อมูลจากฐานข้อมูล "ManpowerReq"
             string query = @"
                 SELECT 
                     e.Process, 
                     e.SkillGroup, 
-                    COUNT(e.MPRID) AS EmployeeCount
+                    e.Require  -- ดึงข้อมูลจากคอลัมน์ Require
                 FROM ManpowerReq e
-                GROUP BY e.Process, e.SkillGroup
                 ORDER BY e.Process, e.SkillGroup;
             ";
 
@@ -52,9 +51,9 @@ namespace Api.Controllers
                         {
                             var result = new
                             {
-                                Process = reader["Process"],
-                                SkillGroup = reader["SkillGroup"],
-                                EmployeeCount = reader["EmployeeCount"]
+                                process = reader["Process"],  // ดึงค่า Process
+                                skillGroup = reader["SkillGroup"],  // ดึงค่า SkillGroup
+                                require = reader["Require"]  // ดึงค่า Require
                             };
                             resultList.Add(result);
                         }

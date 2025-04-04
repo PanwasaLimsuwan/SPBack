@@ -46,7 +46,7 @@ const drawChart = () => {
   ];
 
   const layout = {
-    title: 'Monthly Overtime Hours',
+    title: 'Monthly Overtime',
     xaxis: { title: 'Month' },
     yaxis: { title: 'Total OT Hours', rangemode: 'tozero' },
     paper_bgcolor: '#fff',

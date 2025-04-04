@@ -5,7 +5,7 @@ namespace Api.Controllers
     /// <summary>
     ///     Controller สำหรับการดำเนินการคำสั่ง SQL และการส่งผลลัพธ์เป็น JSON
     /// </summary>
-    public class LibResponseController : Controller
+    public class LibResponseController : ControllerBase
     {
         private readonly IConfiguration _configuration;
 
@@ -14,61 +14,25 @@ namespace Api.Controllers
             _configuration = configuration;
         }
 
-
         /// <summary>
         ///     ส่งคำตอบ JSON มาตรฐานที่มีสถานะ รหัส และข้อมูลที่ถูกกำหนดไว้
         /// </summary>
-        public JsonResult ResponseResult(string status, int code, string message = "", JsonResult data = null)
+        public JsonResult ResponseResult(string status, int code, string message = "", object data = null)
         {
-            if (data == null)
+            return new JsonResult(new
             {
-                return new JsonResult(new
-                {
-                    status = status,
-                    code = code,
-                    message = message,
-                    time = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                    data = new { }
-                })
-                {
-                    StatusCode = code
-                };
-            }
-            else
+                status = status,
+                code = code,
+                message = message,
+                time = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                data = data ?? new { }
+            })
             {
-                if (data is JsonResult jsonResult)
-                {
-                    return new JsonResult(new
-                    {
-                        status = status,
-                        code = code,
-                        message = message,
-                        time = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                        data = data.Value
-                    })
-                    {
-                        StatusCode = code
-                    };
-                }
-                else
-                {
-                    return new JsonResult(new
-                    {
-                        status = status,
-                        code = code,
-                        message = message,
-                        time = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                        data = data
-                    })
-                    {
-                        StatusCode = code
-                    };
-                }
-            }
+                StatusCode = code
+            };
         }
 
-        // ฟังก์ชันอื่น ๆ ที่ให้มา
-        public JsonResult Success(JsonResult data)
+        public JsonResult Success(object data)
         {
             return ResponseResult("success", 200, "Data retrieved successfully.", data);
         }

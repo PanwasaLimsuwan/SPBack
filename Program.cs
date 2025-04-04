@@ -19,12 +19,17 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+
 // Add services to the container.
 builder.Services.AddControllers();
 
 // Add Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient(); // สำหรับ BackgroundService ใช้เรียก API
+// builder.Services.AddHostedService<GateToWorktimeJob>(); // ลงทะเบียน background job
+// builder.Services.AddHostedService<CalculatedOTJob>();
+
 
 var app = builder.Build();
 

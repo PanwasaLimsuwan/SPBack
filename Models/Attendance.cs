@@ -6,12 +6,12 @@ namespace Api.Models
 {
     [Key]
     public int AttendanceID { get; set; }
-    public int EmpID { get; set; }
-    public EmployeeInfo EmployeeInfo { get; set; }    public DateTime? Date { get; set; }
+    public string EmpID { get; set; }
+    public DateTime? Date { get; set; }
     public TimeSpan? CheckInTime { get; set; }
     public TimeSpan? CheckOutTime { get; set; }
-    // public TimeSpan? ScheduledStartTime { get; set; }
-    // public TimeSpan? ScheduledEndTime { get; set; }
+    public TimeSpan? ScheduledStartTime { get; set; }
+    public TimeSpan? ScheduledEndTime { get; set; }
     public string? Status { get; set; }
     public int? WeekNumber { get; set; }
 }

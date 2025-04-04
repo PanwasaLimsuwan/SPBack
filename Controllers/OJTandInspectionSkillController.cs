@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using Api.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
+using System;
+using Api.Models;
 
 namespace Api.Controllers
 {
@@ -10,104 +12,156 @@ namespace Api.Controllers
     [Route("api/[controller]")]
     public class OJTandInspectionSkillController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly string _connectionString;
 
-        public OJTandInspectionSkillController(ApplicationDbContext context)
+        public OJTandInspectionSkillController(IConfiguration configuration)
         {
-            _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // ดึงข้อมูลจากทั้ง EmployeeInfo และ OJTandInspectionSkill โดยใช้ EmpID
+        // GET: api/OJTandInspectionSkill
         [HttpGet]
-        public async Task<IActionResult> GetOJTandInspectionSkills()
+        public async Task<IActionResult> GetAll()
         {
-            var combinedData = await (from employee in _context.EmployeeInfo
-                                    //   join skill in _context.OJTandInspectionSkill
-                                    //   on employee.EmpID.ToString() equals skill.EmpID
-                                      select new 
-                                      {
-                                          EmpID = employee.EmpID,
-                                          FirstName = employee.FirstName,
-                                          LastName = employee.LastName,
-                                          Division = employee.Division,
-                                          Department = employee.Department,
-                                          Position = employee.Position,
-                                          Email = employee.Email,
-                                        //   CourseNo = skill.CourseNo,
-                                        //   CourseGroup = skill.CourseGroup,
-                                        //   Biz = skill.Biz,
-                                        //   Process = skill.Process,
-                                        //   SkillGroup = skill.SkillGroup,
-                                        //   Active = skill.Active
-                                      }).ToListAsync();
+            var result = new List<OJTandInspectionSkill>();
 
-            return Ok(combinedData);
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM OJTandInspectionSkill", conn);
+                var reader = await cmd.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new OJTandInspectionSkill
+                    {
+                        CourseNo = reader.GetString(0),
+                        CourseGroup = reader.IsDBNull(1) ? null : reader.GetString(1),
+                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        CerNo = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        Active = reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                        SkillGroup = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        EmpID = reader.IsDBNull(7) ? null : reader.GetString(7)
+                    });
+                }
+            }
+
+            return Ok(result);
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetOJTandInspectionSkillById(string id)
+        // GET: api/OJTandInspectionSkill/{courseNo}
+        [HttpGet("{courseNo}")]
+        public async Task<IActionResult> GetByCourseNo(string courseNo)
         {
-            var skill = await _context.OJTandInspectionSkill.FindAsync(id);
-            if (skill == null)
+            OJTandInspectionSkill skill = null;
+
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("OJT and inspection skill not found");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM OJTandInspectionSkill WHERE CourseNo = @courseNo", conn);
+                cmd.Parameters.AddWithValue("@courseNo", courseNo);
+
+                var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    skill = new OJTandInspectionSkill
+                    {
+                        CourseNo = reader.GetString(0),
+                        CourseGroup = reader.IsDBNull(1) ? null : reader.GetString(1),
+                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        CerNo = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        Active = reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                        SkillGroup = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        EmpID = reader.IsDBNull(7) ? null : reader.GetString(7)
+                    };
+                }
             }
+
+            if (skill == null)
+                return NotFound();
+
             return Ok(skill);
         }
 
+        // POST: api/OJTandInspectionSkill
         [HttpPost]
-        public async Task<IActionResult> CreateOJTandInspectionSkill([FromBody] OJTandInspectionSkill skill)
+        public async Task<IActionResult> Create([FromBody] OJTandInspectionSkill skill)
         {
-            if (skill == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("OJT and inspection skill is null");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    INSERT INTO OJTandInspectionSkill 
+                        (CourseNo, CourseGroup, Biz, Process, CerNo, Active, SkillGroup, EmpID)
+                    VALUES 
+                        (@CourseNo, @CourseGroup, @Biz, @Process, @CerNo, @Active, @SkillGroup, @EmpID)", conn);
+
+                cmd.Parameters.AddWithValue("@CourseNo", skill.CourseNo);
+                cmd.Parameters.AddWithValue("@CourseGroup", (object?)skill.CourseGroup ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Biz", (object?)skill.Biz ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Process", (object?)skill.Process ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@CerNo", (object?)skill.CerNo ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Active", (object?)skill.Active ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SkillGroup", (object?)skill.SkillGroup ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@EmpID", (object?)skill.EmpID ?? DBNull.Value);
+
+                await cmd.ExecuteNonQueryAsync();
             }
 
-            _context.OJTandInspectionSkill.Add(skill);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetOJTandInspectionSkillById), new { id = skill.CourseNo }, skill);
+            return Ok("Created");
         }
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateOJTandInspectionSkill(string id, [FromBody] OJTandInspectionSkill skill)
+        // PUT: api/OJTandInspectionSkill/{courseNo}
+        [HttpPut("{courseNo}")]
+        public async Task<IActionResult> Update(string courseNo, [FromBody] OJTandInspectionSkill skill)
         {
-            if (id != skill.CourseNo)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("ID mismatch");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    UPDATE OJTandInspectionSkill SET
+                        CourseGroup = @CourseGroup,
+                        Biz = @Biz,
+                        Process = @Process,
+                        CerNo = @CerNo,
+                        Active = @Active,
+                        SkillGroup = @SkillGroup,
+                        EmpID = @EmpID
+                    WHERE CourseNo = @CourseNo", conn);
 
-            _context.Entry(skill).State = EntityState.Modified;
+                cmd.Parameters.AddWithValue("@CourseNo", courseNo);
+                cmd.Parameters.AddWithValue("@CourseGroup", (object?)skill.CourseGroup ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Biz", (object?)skill.Biz ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Process", (object?)skill.Process ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@CerNo", (object?)skill.CerNo ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Active", (object?)skill.Active ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SkillGroup", (object?)skill.SkillGroup ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@EmpID", (object?)skill.EmpID ?? DBNull.Value);
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.OJTandInspectionSkill.Any(e => e.CourseNo == id))
-                {
-                    return NotFound("OJT and inspection skill not found");
-                }
-                else
-                {
-                    throw;
-                }
+                var rows = await cmd.ExecuteNonQueryAsync();
+                if (rows == 0)
+                    return NotFound();
             }
 
             return NoContent();
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteOJTandInspectionSkill(string id)
+        // DELETE: api/OJTandInspectionSkill/{courseNo}
+        [HttpDelete("{courseNo}")]
+        public async Task<IActionResult> Delete(string courseNo)
         {
-            var skill = await _context.OJTandInspectionSkill.FindAsync(id);
-            if (skill == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("OJT and inspection skill not found");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("DELETE FROM OJTandInspectionSkill WHERE CourseNo = @courseNo", conn);
+                cmd.Parameters.AddWithValue("@courseNo", courseNo);
 
-            _context.OJTandInspectionSkill.Remove(skill);
-            await _context.SaveChangesAsync();
+                var rows = await cmd.ExecuteNonQueryAsync();
+                if (rows == 0)
+                    return NotFound();
+            }
 
             return NoContent();
         }

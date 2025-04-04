@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using Api.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
+using System;
+using Api.Models;
 
 namespace Api.Controllers
 {
@@ -10,72 +12,125 @@ namespace Api.Controllers
     [Route("api/[controller]")]
     public class ManpowerReqController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly string _connectionString;
 
-        public ManpowerReqController(ApplicationDbContext context)
+        public ManpowerReqController(IConfiguration configuration)
         {
-            _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
         // GET: api/ManpowerReq
         [HttpGet]
-        public async Task<IActionResult> GetManpowerReqs()
+        public async Task<IActionResult> GetAll()
         {
-            var manpowerReqs = await _context.ManpowerReq.ToListAsync();
-            return Ok(manpowerReqs);
+            var result = new List<ManpowerReq>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM ManpowerReq", conn);
+                var reader = await cmd.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new ManpowerReq
+                    {
+                        MPRID = reader.GetString(0),
+                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
+                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        Require = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        SkillGroup = reader.IsDBNull(5) ? null : reader.GetString(5)
+                    });
+                }
+            }
+
+            return Ok(result);
         }
 
         // GET: api/ManpowerReq/{id}
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetManpowerReqById(string id)
+        public async Task<IActionResult> GetById(string id)
         {
-            var manpowerReq = await _context.ManpowerReq.FindAsync(id);
-            if (manpowerReq == null)
+            ManpowerReq req = null;
+
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("Manpower request not found");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM ManpowerReq WHERE MPRID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+
+                var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    req = new ManpowerReq
+                    {
+                        MPRID = reader.GetString(0),
+                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
+                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        Require = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        SkillGroup = reader.IsDBNull(5) ? null : reader.GetString(5)
+                    };
+                }
             }
-            return Ok(manpowerReq);
+
+            if (req == null)
+                return NotFound();
+
+            return Ok(req);
         }
 
         // POST: api/ManpowerReq
         [HttpPost]
-        public async Task<IActionResult> CreateManpowerReq([FromBody] ManpowerReq req)
+        public async Task<IActionResult> Create([FromBody] ManpowerReq req)
         {
-            if (req == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("Manpower request is null");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    INSERT INTO ManpowerReq (MPRID, Date, Biz, Process, Require, SkillGroup)
+                    VALUES (@MPRID, @Date, @Biz, @Process, @Require, @SkillGroup)", conn);
+
+                cmd.Parameters.AddWithValue("@MPRID", req.MPRID);
+                cmd.Parameters.AddWithValue("@Date", (object?)req.Date ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Biz", (object?)req.Biz ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Process", (object?)req.Process ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Require", (object?)req.Require ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SkillGroup", (object?)req.SkillGroup ?? DBNull.Value);
+
+                await cmd.ExecuteNonQueryAsync();
             }
 
-            _context.ManpowerReq.Add(req);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetManpowerReqById), new { id = req.MPRID }, req); // Use MPRID instead of Id
+            return Ok("Created");
         }
 
         // PUT: api/ManpowerReq/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateManpowerReq(string id, [FromBody] ManpowerReq req)
+        public async Task<IActionResult> Update(string id, [FromBody] ManpowerReq req)
         {
-            if (id != req.MPRID) // Use MPRID instead of Id
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("ID mismatch");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    UPDATE ManpowerReq SET 
+                        Date = @Date,
+                        Biz = @Biz,
+                        Process = @Process,
+                        Require = @Require,
+                        SkillGroup = @SkillGroup
+                    WHERE MPRID = @MPRID", conn);
 
-            _context.Entry(req).State = EntityState.Modified;
+                cmd.Parameters.AddWithValue("@MPRID", id);
+                cmd.Parameters.AddWithValue("@Date", (object?)req.Date ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Biz", (object?)req.Biz ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Process", (object?)req.Process ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Require", (object?)req.Require ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SkillGroup", (object?)req.SkillGroup ?? DBNull.Value);
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.ManpowerReq.Any(e => e.MPRID == id)) // Use MPRID instead of Id
-                {
-                    return NotFound("Manpower request not found");
-                }
-                else
-                {
-                    throw;
-                }
+                var rows = await cmd.ExecuteNonQueryAsync();
+                if (rows == 0)
+                    return NotFound();
             }
 
             return NoContent();
@@ -83,16 +138,18 @@ namespace Api.Controllers
 
         // DELETE: api/ManpowerReq/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteManpowerReq(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            var req = await _context.ManpowerReq.FindAsync(id);
-            if (req == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("Manpower request not found");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("DELETE FROM ManpowerReq WHERE MPRID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
 
-            _context.ManpowerReq.Remove(req);
-            await _context.SaveChangesAsync();
+                var rows = await cmd.ExecuteNonQueryAsync();
+                if (rows == 0)
+                    return NotFound();
+            }
 
             return NoContent();
         }

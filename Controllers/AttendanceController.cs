@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using Api.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
+using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
+using Api.Models;
 
 namespace Api.Controllers
 {
@@ -10,91 +12,170 @@ namespace Api.Controllers
     [Route("api/[controller]")]
     public class AttendanceController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly string _connectionString;
 
-        public AttendanceController(ApplicationDbContext context)
+        public AttendanceController(IConfiguration configuration)
         {
-            _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/Attendance
         [HttpGet]
-        public async Task<IActionResult> GetAttendances()
+        public async Task<IActionResult> GetAllAttendance()
         {
-            var attendances = await _context.Attendance.ToListAsync();
-            return Ok(attendances);
+            var result = new List<Attendance>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                var query = "SELECT * FROM Attendance";
+
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        result.Add(new Attendance
+                        {
+                            AttendanceID = Convert.ToInt32(reader["AttendanceID"]),
+                            EmpID = reader["EmpID"].ToString(),
+                            Date = reader["Date"] as DateTime?,
+                            CheckInTime = reader["CheckInTime"] as TimeSpan?,
+                            CheckOutTime = reader["CheckOutTime"] as TimeSpan?,
+                            ScheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
+                            ScheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
+                            Status = reader["Status"]?.ToString(),
+                            WeekNumber = reader["WeekNumber"] as int?
+                        });
+                    }
+                }
+            }
+
+            return Ok(result);
         }
 
-        // GET: api/Attendance/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAttendanceById(int id)
         {
-            var attendance = await _context.Attendance.FindAsync(id);
-            if (attendance == null)
+            Attendance attendance = null;
+
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("Attendance record not found");
+                await conn.OpenAsync();
+                var query = "SELECT * FROM Attendance WHERE AttendanceID = @id";
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", id);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            attendance = new Attendance
+                            {
+                                AttendanceID = Convert.ToInt32(reader["AttendanceID"]),
+                                EmpID = reader["EmpID"].ToString(),
+                                Date = reader["Date"] as DateTime?,
+                                CheckInTime = reader["CheckInTime"] as TimeSpan?,
+                                CheckOutTime = reader["CheckOutTime"] as TimeSpan?,
+                                ScheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
+                                ScheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
+                                Status = reader["Status"]?.ToString(),
+                                WeekNumber = reader["WeekNumber"] as int?
+                            };
+                        }
+                    }
+                }
             }
+
+            if (attendance == null)
+                return NotFound("Attendance record not found");
+
             return Ok(attendance);
         }
 
-        // POST: api/Attendance
         [HttpPost]
         public async Task<IActionResult> CreateAttendance([FromBody] Attendance attendance)
         {
-            if (attendance == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("Attendance is null");
+                await conn.OpenAsync();
+                var query = @"
+                    INSERT INTO Attendance (EmpID, Date, CheckInTime, CheckOutTime, ScheduledStartTime, ScheduledEndTime, Status, WeekNumber)
+                    VALUES (@EmpID, @Date, @CheckInTime, @CheckOutTime, @ScheduledStartTime, @ScheduledEndTime, @Status, @WeekNumber)";
+
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@EmpID", attendance.EmpID);
+                    cmd.Parameters.AddWithValue("@Date", (object?)attendance.Date ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CheckInTime", (object?)attendance.CheckInTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CheckOutTime", (object?)attendance.CheckOutTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ScheduledStartTime", (object?)attendance.ScheduledStartTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ScheduledEndTime", (object?)attendance.ScheduledEndTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Status", (object?)attendance.Status ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@WeekNumber", (object?)attendance.WeekNumber ?? DBNull.Value);
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
 
-            _context.Attendance.Add(attendance);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetAttendanceById), new { id = attendance.AttendanceID }, attendance);
+            return Ok("Attendance record created successfully");
         }
 
-        // PUT: api/Attendance/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateAttendance(int id, [FromBody] Attendance attendance)
         {
-            if (id != attendance.AttendanceID)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("ID mismatch");
-            }
+                await conn.OpenAsync();
+                var query = @"
+                    UPDATE Attendance SET 
+                        EmpID = @EmpID,
+                        Date = @Date,
+                        CheckInTime = @CheckInTime,
+                        CheckOutTime = @CheckOutTime,
+                        ScheduledStartTime = @ScheduledStartTime,
+                        ScheduledEndTime = @ScheduledEndTime,
+                        Status = @Status,
+                        WeekNumber = @WeekNumber
+                    WHERE AttendanceID = @id";
 
-            _context.Entry(attendance).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Attendance.Any(e => e.AttendanceID == id))
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    return NotFound("Attendance record not found");
-                }
-                else
-                {
-                    throw;
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@EmpID", attendance.EmpID);
+                    cmd.Parameters.AddWithValue("@Date", (object?)attendance.Date ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CheckInTime", (object?)attendance.CheckInTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CheckOutTime", (object?)attendance.CheckOutTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ScheduledStartTime", (object?)attendance.ScheduledStartTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ScheduledEndTime", (object?)attendance.ScheduledEndTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Status", (object?)attendance.Status ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@WeekNumber", (object?)attendance.WeekNumber ?? DBNull.Value);
+
+                    var affectedRows = await cmd.ExecuteNonQueryAsync();
+                    if (affectedRows == 0) return NotFound("Attendance record not found");
                 }
             }
 
-            return NoContent();
+            return Ok("Attendance record updated successfully");
         }
 
-        // DELETE: api/Attendance/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAttendance(int id)
         {
-            var attendance = await _context.Attendance.FindAsync(id);
-            if (attendance == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("Attendance record not found");
+                await conn.OpenAsync();
+                var query = "DELETE FROM Attendance WHERE AttendanceID = @id";
+
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", id);
+                    var affectedRows = await cmd.ExecuteNonQueryAsync();
+                    if (affectedRows == 0) return NotFound("Attendance record not found");
+                }
             }
 
-            _context.Attendance.Remove(attendance);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok("Attendance record deleted successfully");
         }
     }
 }

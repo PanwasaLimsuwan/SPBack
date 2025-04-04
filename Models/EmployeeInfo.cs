@@ -19,15 +19,5 @@ namespace Api.Models
         public string? ShiftCode { get; set; }
         public string? Position { get; set; }
         public string Email { get; set; }
-        public int PlanID { get; set; }
-        public ManpowerPlan ManpowerPlan { get; set; }
-
-        public ICollection<GateEntry> GateEntry { get; set; }
-        public ICollection<CleanroomEntry> CleanroomEntry { get; set; }
-        public ICollection<OJTandInspectionSkill> OJTandInspectionSkill { get; set; }
-        public ICollection<HeadcountTransition> HeadcountTransition { get; set; }
-        public ICollection<Worktime> Worktime { get; set; } 
-        public ICollection<EICC_Control> EICC_Control { get; set; }
-        public ICollection<Attendance> Attendance { get; set; }
     }
 }

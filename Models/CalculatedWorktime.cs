@@ -1,0 +1,16 @@
+// Models/CalculatedWorktime.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace Api.Models
+{
+    public class CalculatedWorktime
+    {
+        [Key]
+        public int WorktimeID { get; set; }
+        public string EmpID { get; set; }
+        public DateTime Date { get; set; }
+        public double WorkedHours { get; set; }
+        public string Status { get; set; }
+    }
+}

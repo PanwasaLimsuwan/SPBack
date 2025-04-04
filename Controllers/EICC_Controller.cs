@@ -1,98 +1,149 @@
 using Microsoft.AspNetCore.Mvc;
-using Api.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
+using Api.Models;
 
 namespace Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class EICC_ControlController : ControllerBase
+    public class EICCControlController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly string _connectionString;
 
-        public EICC_ControlController(ApplicationDbContext context)
+        public EICCControlController(IConfiguration configuration)
         {
-            _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/EICC_Control
         [HttpGet]
-        public async Task<IActionResult> GetEICCControls()
+        public async Task<IActionResult> GetAll()
         {
-            var controls = await _context.EICC_Control.ToListAsync();
-            return Ok(controls);
+            var results = new List<EICC_Control>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM EICC_Control", conn);
+                var reader = await cmd.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    results.Add(new EICC_Control
+                    {
+                        ControlID = reader.GetInt32(0),
+                        EmpID = reader.GetString(1),
+                        WeekID = reader.GetInt32(2),
+                        TotalHours = reader.IsDBNull(3) ? null : reader.GetFloat(3),
+                        DaysWorked = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        Status = reader.GetString(5)
+                    });
+                }
+            }
+
+            return Ok(results);
         }
 
-        // GET: api/EICC_Control/{id}
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetEICCControlById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var control = await _context.EICC_Control.FindAsync(id);
-            if (control == null)
+            EICC_Control result = null;
+
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("EICC control not found");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM EICC_Control WHERE ControlID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+
+                var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    result = new EICC_Control
+                    {
+                        ControlID = reader.GetInt32(0),
+                        EmpID = reader.GetString(1),
+                        WeekID = reader.GetInt32(2),
+                        TotalHours = reader.IsDBNull(3) ? null : reader.GetFloat(3),
+                        DaysWorked = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        Status = reader.GetString(5)
+                    };
+                }
             }
-            return Ok(control);
+
+            if (result == null)
+                return NotFound();
+
+            return Ok(result);
         }
 
-        // POST: api/EICC_Control
         [HttpPost]
-        public async Task<IActionResult> CreateEICCControl([FromBody] EICC_Control control)
+        public async Task<IActionResult> Create(EICC_Control control)
         {
-            if (control == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("EICC control is null");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    INSERT INTO EICC_Control (EmpID, WeekID, TotalHours, DaysWorked, Status)
+                    VALUES (@EmpID, @WeekID, @TotalHours, @DaysWorked, @Status)", conn);
+
+                cmd.Parameters.AddWithValue("@EmpID", control.EmpID);
+                cmd.Parameters.AddWithValue("@WeekID", control.WeekID);
+                cmd.Parameters.AddWithValue("@TotalHours", (object)control.TotalHours ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@DaysWorked", (object)control.DaysWorked ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Status", control.Status);
+
+                await cmd.ExecuteNonQueryAsync();
             }
 
-            _context.EICC_Control.Add(control);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetEICCControlById), new { id = control.ControlID }, control); // Use ControlID instead of Id
+            return Ok("Created");
         }
 
-        // PUT: api/EICC_Control/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateEICCControl(int id, [FromBody] EICC_Control control)
+        public async Task<IActionResult> Update(int id, EICC_Control control)
         {
-            if (id != control.ControlID) // Use ControlID instead of Id
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("ID mismatch");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    UPDATE EICC_Control SET
+                        EmpID = @EmpID,
+                        WeekID = @WeekID,
+                        TotalHours = @TotalHours,
+                        DaysWorked = @DaysWorked,
+                        Status = @Status
+                    WHERE ControlID = @ControlID", conn);
 
-            _context.Entry(control).State = EntityState.Modified;
+                cmd.Parameters.AddWithValue("@ControlID", id);
+                cmd.Parameters.AddWithValue("@EmpID", control.EmpID);
+                cmd.Parameters.AddWithValue("@WeekID", control.WeekID);
+                cmd.Parameters.AddWithValue("@TotalHours", (object)control.TotalHours ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@DaysWorked", (object)control.DaysWorked ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Status", control.Status);
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.EICC_Control.Any(e => e.ControlID == id)) // Use ControlID instead of Id
-                {
-                    return NotFound("EICC control not found");
-                }
-                else
-                {
-                    throw;
-                }
+                int rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return NotFound();
             }
 
             return NoContent();
         }
 
-        // DELETE: api/EICC_Control/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteEICCControl(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var control = await _context.EICC_Control.FindAsync(id);
-            if (control == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("EICC control not found");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("DELETE FROM EICC_Control WHERE ControlID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
 
-            _context.EICC_Control.Remove(control);
-            await _context.SaveChangesAsync();
+                int rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return NotFound();
+            }
 
             return NoContent();
         }

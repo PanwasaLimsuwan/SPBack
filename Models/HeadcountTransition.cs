@@ -9,8 +9,7 @@ namespace Api.Models
 
     public DateTime DateTime { get; set; } 
     public string? TransType { get; set; } 
-    public int EmpID { get; set; }
-    public EmployeeInfo EmployeeInfo { get; set; }
+    public string? EmpID { get; set; } 
 }
 
 }

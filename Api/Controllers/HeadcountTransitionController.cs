@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using Api.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
+using System;
+using Api.Models;
 
 namespace Api.Controllers
 {
@@ -10,84 +12,134 @@ namespace Api.Controllers
     [Route("api/[controller]")]
     public class HeadcountTransitionController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly string _connectionString;
 
-        public HeadcountTransitionController(ApplicationDbContext context)
+        public HeadcountTransitionController(IConfiguration configuration)
         {
-            _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
+        // GET: api/HeadcountTransition
         [HttpGet]
-        public async Task<IActionResult> GetHeadcountTransitions()
+        public async Task<IActionResult> GetAll()
         {
-            var transitions = await _context.HeadcountTransition.ToListAsync();
+            var transitions = new List<HeadcountTransition>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM HeadcountTransition", conn);
+                var reader = await cmd.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+{
+    transitions.Add(new HeadcountTransition
+    {
+        Id = (int)reader["Id"],
+        DateTime = (DateTime)reader["DateTime"],
+        TransType = reader["TransType"]?.ToString(),
+        EmpID = reader["EmpID"]?.ToString()
+    });
+}
+
+            }
+
             return Ok(transitions);
         }
 
+        // GET: api/HeadcountTransition/{id}
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetHeadcountTransitionById(DateTime id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var transition = await _context.HeadcountTransition.FindAsync(id);
-            if (transition == null)
+            HeadcountTransition transition = null;
+
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("Headcount transition not found");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("SELECT * FROM HeadcountTransition WHERE Id = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+
+                var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    transition = new HeadcountTransition
+                    {
+                        Id = reader.GetInt32(0),
+                        DateTime = reader.GetDateTime(1),
+                        TransType = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        EmpID = reader.IsDBNull(3) ? null : reader.GetString(3)
+                    };
+                }
             }
+
+            if (transition == null)
+                return NotFound();
+
             return Ok(transition);
         }
 
+        // POST: api/HeadcountTransition
         [HttpPost]
-        public async Task<IActionResult> CreateHeadcountTransition([FromBody] HeadcountTransition transition)
+        public async Task<IActionResult> Create([FromBody] HeadcountTransition transition)
         {
-            if (transition == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("Headcount transition is null");
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    INSERT INTO HeadcountTransition (DateTime, TransType, EmpID)
+                    VALUES (@DateTime, @TransType, @EmpID)", conn);
+
+                cmd.Parameters.AddWithValue("@DateTime", transition.DateTime);
+                cmd.Parameters.AddWithValue("@TransType", (object?)transition.TransType ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@EmpID", (object?)transition.EmpID ?? DBNull.Value);
+
+                await cmd.ExecuteNonQueryAsync();
             }
 
-            _context.HeadcountTransition.Add(transition);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetHeadcountTransitionById), new { id = transition.DateTime }, transition);
+            return Ok("Created");
         }
 
+        // PUT: api/HeadcountTransition/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateHeadcountTransition(DateTime id, [FromBody] HeadcountTransition transition)
+        public async Task<IActionResult> Update(int id, [FromBody] HeadcountTransition transition)
         {
-            if (id != transition.DateTime)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return BadRequest("ID mismatch");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand(@"
+                    UPDATE HeadcountTransition SET
+                        DateTime = @DateTime,
+                        TransType = @TransType,
+                        EmpID = @EmpID
+                    WHERE Id = @Id", conn);
 
-            _context.Entry(transition).State = EntityState.Modified;
+                cmd.Parameters.AddWithValue("@Id", id);
+                cmd.Parameters.AddWithValue("@DateTime", transition.DateTime);
+                cmd.Parameters.AddWithValue("@TransType", (object?)transition.TransType ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@EmpID", (object?)transition.EmpID ?? DBNull.Value);
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.HeadcountTransition.Any(e => e.DateTime == id))
-                {
-                    return NotFound("Headcount transition not found");
-                }
-                else
-                {
-                    throw;
-                }
+                int rows = await cmd.ExecuteNonQueryAsync();
+                if (rows == 0)
+                    return NotFound();
             }
 
             return NoContent();
         }
 
+        // DELETE: api/HeadcountTransition/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteHeadcountTransition(DateTime id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var transition = await _context.HeadcountTransition.FindAsync(id);
-            if (transition == null)
+            using (var conn = new SqlConnection(_connectionString))
             {
-                return NotFound("Headcount transition not found");
-            }
+                await conn.OpenAsync();
+                var cmd = new SqlCommand("DELETE FROM HeadcountTransition WHERE Id = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
 
-            _context.HeadcountTransition.Remove(transition);
-            await _context.SaveChangesAsync();
+                int rows = await cmd.ExecuteNonQueryAsync();
+                if (rows == 0)
+                    return NotFound();
+            }
 
             return NoContent();
         }

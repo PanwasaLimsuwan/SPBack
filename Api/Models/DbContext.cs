@@ -40,5 +40,8 @@ namespace Api.Models
 
         // DbSet สำหรับการจัดการข้อมูล OTJandInspectionSkill
         public DbSet<OJTandInspectionSkill> OJTandInspectionSkill { get; set; }
+
+        // DbSet สำหรับการจัดการข้อมูล Skill
+        public DbSet<Skill> Skill { get; set; }
     }
 }

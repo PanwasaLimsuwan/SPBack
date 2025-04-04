@@ -17,7 +17,7 @@ namespace Api.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "8.0.3")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -39,15 +39,11 @@ namespace Api.Migrations
                     b.Property<DateTime?>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
 
-                    b.Property<TimeSpan?>("ScheduledEndTime")
-                        .HasColumnType("time");
-
-                    b.Property<TimeSpan?>("ScheduledStartTime")
-                        .HasColumnType("time");
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .HasColumnType("nvarchar(max)");
@@ -56,6 +52,8 @@ namespace Api.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("AttendanceID");
+
+                    b.HasIndex("EmployeeInfoEmpID");
 
                     b.ToTable("Attendance");
                 });
@@ -78,17 +76,15 @@ namespace Api.Migrations
                     b.Property<DateTime?>("CheckOutDateTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
 
-                    b.Property<DateTime?>("HeadCountDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LocationStatus")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
 
                     b.HasKey("CEntryID");
+
+                    b.HasIndex("EmployeeInfoEmpID");
 
                     b.ToTable("CleanroomEntry");
                 });
@@ -104,9 +100,11 @@ namespace Api.Migrations
                     b.Property<int?>("DaysWorked")
                         .HasColumnType("int");
 
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -118,7 +116,14 @@ namespace Api.Migrations
                     b.Property<int>("WeekID")
                         .HasColumnType("int");
 
+                    b.Property<int>("WeeklyScheduleWeekID")
+                        .HasColumnType("int");
+
                     b.HasKey("ControlID");
+
+                    b.HasIndex("EmployeeInfoEmpID");
+
+                    b.HasIndex("WeeklyScheduleWeekID");
 
                     b.ToTable("EICC_Control");
                 });
@@ -162,6 +167,12 @@ namespace Api.Migrations
                     b.Property<string>("LastName")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("ManpowerPlanPlanID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PlanID")
+                        .HasColumnType("int");
+
                     b.Property<string>("Position")
                         .HasColumnType("nvarchar(max)");
 
@@ -172,6 +183,8 @@ namespace Api.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("EmpID");
+
+                    b.HasIndex("ManpowerPlanPlanID");
 
                     b.ToTable("EmployeeInfo");
                 });
@@ -184,9 +197,11 @@ namespace Api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GateEntryID"));
 
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("EntryDateTime")
                         .HasColumnType("datetime2");
@@ -208,21 +223,34 @@ namespace Api.Migrations
 
                     b.HasKey("GateEntryID");
 
+                    b.HasIndex("EmployeeInfoEmpID");
+
                     b.ToTable("GateEntry");
                 });
 
             modelBuilder.Entity("Api.Models.HeadcountTransition", b =>
                 {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<DateTime>("DateTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("EmpID")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
 
                     b.Property<string>("TransType")
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("DateTime");
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeInfoEmpID");
 
                     b.ToTable("HeadcountTransition");
                 });
@@ -237,10 +265,6 @@ namespace Api.Migrations
 
                     b.Property<int?>("ActualHeadcount")
                         .HasColumnType("int");
-
-                    b.Property<string>("Attendance")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("Date")
                         .HasColumnType("datetime2");
@@ -277,6 +301,9 @@ namespace Api.Migrations
                     b.Property<DateTime?>("Date")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("ManpowerPlanPlanID")
+                        .HasColumnType("int");
+
                     b.Property<string>("Process")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -289,6 +316,8 @@ namespace Api.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("MPRID");
+
+                    b.HasIndex("ManpowerPlanPlanID");
 
                     b.ToTable("ManpowerReq");
                 });
@@ -313,9 +342,14 @@ namespace Api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ManpowerReqMPRID")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Process")
                         .IsRequired()
@@ -327,7 +361,54 @@ namespace Api.Migrations
 
                     b.HasKey("CourseNo");
 
+                    b.HasIndex("EmployeeInfoEmpID");
+
+                    b.HasIndex("ManpowerReqMPRID");
+
                     b.ToTable("OJTandInspectionSkill");
+                });
+
+            modelBuilder.Entity("Api.Models.Skill", b =>
+                {
+                    b.Property<int>("EmpID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmpID"));
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Inspection")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("MachineSAB1")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MachineSAB2")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MachineSAB3")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Material")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Operation")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SkillGroup")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("EmpID");
+
+                    b.ToTable("Skill");
                 });
 
             modelBuilder.Entity("Api.Models.WeeklySchedule", b =>
@@ -376,9 +457,11 @@ namespace Api.Migrations
                     b.Property<float?>("EICC_Hours")
                         .HasColumnType("real");
 
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("EmpID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeInfoEmpID")
+                        .HasColumnType("int");
 
                     b.Property<float?>("OT_Hours")
                         .HasColumnType("real");
@@ -395,7 +478,151 @@ namespace Api.Migrations
 
                     b.HasKey("WorkTimeID");
 
+                    b.HasIndex("EmployeeInfoEmpID");
+
                     b.ToTable("Worktime");
+                });
+
+            modelBuilder.Entity("Api.Models.Attendance", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("Attendance")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeInfo");
+                });
+
+            modelBuilder.Entity("Api.Models.CleanroomEntry", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("CleanroomEntry")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeInfo");
+                });
+
+            modelBuilder.Entity("Api.Models.EICC_Control", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("EICC_Control")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Api.Models.WeeklySchedule", "WeeklySchedule")
+                        .WithMany("EICC_Control")
+                        .HasForeignKey("WeeklyScheduleWeekID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeInfo");
+
+                    b.Navigation("WeeklySchedule");
+                });
+
+            modelBuilder.Entity("Api.Models.EmployeeInfo", b =>
+                {
+                    b.HasOne("Api.Models.ManpowerPlan", "ManpowerPlan")
+                        .WithMany("EmployeeInfo")
+                        .HasForeignKey("ManpowerPlanPlanID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ManpowerPlan");
+                });
+
+            modelBuilder.Entity("Api.Models.GateEntry", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("GateEntry")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeInfo");
+                });
+
+            modelBuilder.Entity("Api.Models.HeadcountTransition", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("HeadcountTransition")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeInfo");
+                });
+
+            modelBuilder.Entity("Api.Models.ManpowerReq", b =>
+                {
+                    b.HasOne("Api.Models.ManpowerPlan", "ManpowerPlan")
+                        .WithMany("ManpowerReq")
+                        .HasForeignKey("ManpowerPlanPlanID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ManpowerPlan");
+                });
+
+            modelBuilder.Entity("Api.Models.OJTandInspectionSkill", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("OJTandInspectionSkill")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Api.Models.ManpowerReq", "ManpowerReq")
+                        .WithMany()
+                        .HasForeignKey("ManpowerReqMPRID");
+
+                    b.Navigation("EmployeeInfo");
+
+                    b.Navigation("ManpowerReq");
+                });
+
+            modelBuilder.Entity("Api.Models.Worktime", b =>
+                {
+                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
+                        .WithMany("Worktime")
+                        .HasForeignKey("EmployeeInfoEmpID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeInfo");
+                });
+
+            modelBuilder.Entity("Api.Models.EmployeeInfo", b =>
+                {
+                    b.Navigation("Attendance");
+
+                    b.Navigation("CleanroomEntry");
+
+                    b.Navigation("EICC_Control");
+
+                    b.Navigation("GateEntry");
+
+                    b.Navigation("HeadcountTransition");
+
+                    b.Navigation("OJTandInspectionSkill");
+
+                    b.Navigation("Worktime");
+                });
+
+            modelBuilder.Entity("Api.Models.ManpowerPlan", b =>
+                {
+                    b.Navigation("EmployeeInfo");
+
+                    b.Navigation("ManpowerReq");
+                });
+
+            modelBuilder.Entity("Api.Models.WeeklySchedule", b =>
+                {
+                    b.Navigation("EICC_Control");
                 });
 #pragma warning restore 612, 618
         }

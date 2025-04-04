@@ -1,11 +1,13 @@
 // src/router.js
 import { createRouter, createWebHistory } from 'vue-router';
+import HomeDashboard from './views/HomeDashboard.vue';
 import DashboardMFG from './views/DashboardMFG.vue';
 import DashboardHR from './views/DashboardHR.vue';
 
 const routes = [
-  { path: '/mfg', component: DashboardMFG },
-  { path: '/hr', component: DashboardHR },
+  { path: '/', component: HomeDashboard },
+  { path: '/dashboard-mfg', component: DashboardMFG },
+  { path: '/dashboard-hr', component: DashboardHR },
 ];
 
 const router = createRouter({

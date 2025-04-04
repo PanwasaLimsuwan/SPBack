@@ -1,82 +1,139 @@
 <template>
-  <div id="worked-time-chart"></div>
+  <div class="chart-container">
+    <div id="worked-time-chart" class="scrollable-chart"></div>
+  </div>
 </template>
 
 <script>
 import Plotly from "plotly.js";
+import axios from "axios";
 
 export default {
   name: "WorkedTimeChart",
-  props: {
-    data: Array, // รับข้อมูลพนักงานเข้ามา
+  data() {
+    return {
+      worktime: [],
+      employeeInfo: [],
+      combinedData: [],
+    };
   },
-  mounted() {
+  async mounted() {
+    await this.fetchData();
+    this.prepareData();
     this.drawChart();
   },
   methods: {
-    // คำนวณเปอร์เซ็นต์การทำงานและสี
-    calculateWorkedHours(workTime) {
-      if (!workTime) {
-        return { workedHours: 0, percentage: 0, color: "#00ff00" }; // ค่าเริ่มต้นเมื่อไม่มีข้อมูลที่ถูกต้อง
+    async fetchData() {
+      try {
+        const [workRes, empRes] = await Promise.all([
+          axios.get("http://localhost:5000/api/Worktime"),
+          axios.get("http://localhost:5000/api/EmployeeInfo"),
+        ]);
+        this.worktime = workRes.data;
+        this.employeeInfo = empRes.data;
+      } catch (error) {
+        console.error("Error fetching data:", error);
       }
-
-      const totalWorkTime = 60; // 60 ชั่วโมงเป็น 100%
-      let percentage = (workTime / totalWorkTime) * 100; // คำนวณเปอร์เซ็นต์
-      let color = "#00ff00"; // สีเริ่มต้น (สีเขียว)
-
-      // กำหนดสีตามเปอร์เซ็นต์ที่คำนวณ
-      if (percentage >= 90) {
-        color = "#ff0000"; // สีแดงสำหรับ 90% ขึ้นไป
-      } else if (percentage >= 80) {
-        color = "#ffcc00"; // สีเหลืองสำหรับ 80%-89%
-      }
-
-      return { workedHours: workTime, percentage, color };
     },
 
-    drawChart() {
-      // ตรวจสอบว่ามีข้อมูลหรือไม่
-      if (!this.data || this.data.length === 0) {
-        console.error("No data provided for WorkedTimeChart.");
-        return;
+    prepareData() {
+  const groupedByEmp = {};
+
+  this.worktime
+    .filter(w => w.status === "Active")
+    .forEach(w => {
+      const empID = w.empID;
+      const worked = parseFloat(w.workedHours) || 0;
+
+      if (!groupedByEmp[empID]) {
+        groupedByEmp[empID] = { totalWorked: 0 };
       }
 
+      groupedByEmp[empID].totalWorked += worked;
+    });
+
+    this.combinedData = Object.keys(groupedByEmp).map(empID => {
+  const emp = this.employeeInfo.find(e => `${e.empID}` === `${empID}`);
+  const name = emp ? `${emp.firstName} ${emp.lastName}` : `Emp ${empID}`;
+
+  const total = groupedByEmp[empID].totalWorked;
+  const percent = (total / 60) * 100;
+
+  let color = "#4caf50"; // เขียว
+  if (percent >= 90) color = "#f44336"; // แดง
+  else if (percent >= 80) color = "#ffc107"; // เหลือง
+
+  return { name, percent, color };
+});
+
+// ✅ เรียงลำดับสี และเปอร์เซ็นต์จากมาก → น้อย
+this.combinedData.sort((a, b) => {
+  const getRank = (color) => {
+    if (color === "#f44336") return 1;   // แดง
+    if (color === "#ffc107") return 2;   // เหลือง
+    return 3;                            // เขียว
+  };
+
+  const rankA = getRank(a.color);
+  const rankB = getRank(b.color);
+
+  if (rankA !== rankB) {
+    return rankA - rankB; // เรียงตามสี
+  } else {
+    return b.percent - a.percent; // ถ้าสีเท่ากัน เรียงตามเปอร์เซ็นต์
+  }
+});
+
+},
+
+    drawChart() {
       const chartData = [
         {
-          x: this.data.map(emp => {
-            const { percentage } = this.calculateWorkedHours(emp.WorkTime);
-            return percentage; // ใช้เปอร์เซ็นต์ในการแสดงในกราฟ
-          }),
-          y: this.data.map(emp => `${emp.Firstname} ${emp.Lastname}`), // ชื่อพนักงาน
+          x: this.combinedData.map(emp => emp.percent),
+          y: this.combinedData.map(emp => emp.name),
           type: "bar",
-          orientation: "h", // แกน Y เป็นชื่อพนักงาน
+          orientation: "h",
           marker: {
-            color: this.data.map(emp => {
-              const { color } = this.calculateWorkedHours(emp.WorkTime); // ใช้สีจากการคำนวณ
-              return color; // สีที่คำนวณจากเปอร์เซ็นต์
-            }),
+            color: this.combinedData.map(emp => emp.color),
           },
+          text: this.combinedData.map(emp => `${emp.percent.toFixed(1)}%`),
+          textposition: "auto",
         },
       ];
 
       const layout = {
-        title: "Worked Time (60hrs./week)",
-        height: 300,
-        margin: { l: 200, r: 20, t: 50, b: 50 }, // ปรับขนาดแกน Y ให้กว้างขึ้น
-        xaxis: { title: "Percentage", automargin: true, range: [0, 100] }, // กำหนดให้สูงสุดที่ 100%
-        yaxis: { automargin: true },
-        responsive: true,
+        title: "Worked Time (60 hrs/week)",
+        height: Math.max(400, this.combinedData.length * 40),
+        margin: { l: 200, r: 20, t: 50, b: 50 },
+        xaxis: { title: "Percentage", range: [0, 120] },
+        yaxis: { automargin: true, autorange: "reversed" }, // 👈 พลิกลำดับแกน Y
+        plot_bgcolor: "#f9f9f9",
+        paper_bgcolor: "#fff",
       };
 
-      Plotly.newPlot("worked-time-chart", chartData, layout);
+      Plotly.newPlot("worked-time-chart", chartData, layout, { responsive: true });
     },
   },
 };
 </script>
 
 <style scoped>
+.chart-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 15px;
+  background: #f0f4f8;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
 #worked-time-chart {
   width: 100%;
   height: 100%;
+}
+
+.scrollable-chart::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 100, 100, 0.2);
+  border-radius: 4px;
 }
 </style>

@@ -1,70 +1,119 @@
+<script setup>
+import { ref, onMounted } from 'vue';
+import Plotly from 'plotly.js';
+
+const emit = defineEmits(['filter-skills']);
+
+const months = ref([]);
+const fullySkilledCounts = ref([]);
+const needTrainingCounts = ref([]);
+
+const fetchSkillData = async () => {
+  try {
+    const response = await fetch('http://localhost:5000/api/Skill');
+    const data = await response.json();
+
+    const skillCategories = {
+      'Fully Skilled': 0,
+      'Need Training': 0,
+    };
+
+    data.forEach((employee) => {
+      const isFullySkilled =
+        employee.material === 3 &&
+        employee.operation === 3 &&
+        employee.machineSAB1 === 3 &&
+        employee.machineSAB2 === 3 &&
+        employee.machineSAB3 === 3 &&
+        employee.inspection === 3;
+
+      if (isFullySkilled) {
+        skillCategories['Fully Skilled']++;
+      } else {
+        skillCategories['Need Training']++;
+      }
+    });
+
+    months.value = Object.keys(skillCategories);
+    fullySkilledCounts.value = [skillCategories['Fully Skilled']];
+    needTrainingCounts.value = [skillCategories['Need Training']];
+
+    const trace = {
+      labels: ['Fully Skilled', 'Need Training'],
+      values: [skillCategories['Fully Skilled'], skillCategories['Need Training']],
+      type: 'pie',
+      name: 'Skill Level',
+      marker: {
+        colors: ['rgb(0, 204, 0)', 'rgb(255, 99, 132)'],
+      },
+      textinfo: 'label+percent',
+      hoverinfo: 'label+value+percent',
+    };
+
+    const layout = {
+      title: 'Skill Level Distribution: Fully Skilled vs Need Training',
+      height: 450,
+      width: 450,
+      showlegend: true,
+    };
+
+    Plotly.newPlot('fully-skilled-pie-chart', [trace], layout);
+
+    const chart = document.getElementById('fully-skilled-pie-chart');
+   chart.on('plotly_click', (data) => {
+  const clickedLabel = data.points[0].label;
+  if (clickedLabel === 'Fully Skilled') {
+    emit('filter-skills', 3); // Fully Skilled = ทุกสกิลระดับ 3
+  } else if (clickedLabel === 'Need Training') {
+    emit('filter-skills', 0); // Need Training = มีสกิลต่ำกว่า 3
+  }
+});
+
+  } catch (error) {
+    console.error('Error fetching skill data:', error);
+  }
+};
+
+onMounted(() => {
+  fetchSkillData();
+});
+</script>
+
 <template>
   <div id="fully-skilled-pie-chart"></div>
 </template>
-
-<script>
-import Plotly from "plotly.js";
-
-export default {
-  name: "FullySkilledPieChart",
-  props: {
-    data: {
-      type: Object,
-      required: true,
-    },
-  },
-  mounted() {
-    this.drawChart();
-  },
-  methods: {
-    drawChart() {
-  const chartData = [
-    {
-      values: this.data.values,  // ใช้ข้อมูลที่คำนวณจาก getFullySkilledData
-      labels: this.data.labels,  // ใช้ข้อมูลที่คำนวณจาก getFullySkilledData
-      type: "pie",
-      marker: {
-        colors: this.data.marker ? this.data.marker.colors : ["gray"] // ตรวจสอบว่า data.marker มีค่าไหม
-      }
-    }
-  ];
-
-  const layout = {
-    title: "Skill Competency Overview",
-    height: 450,
-    width: 450,
-    paper_bgcolor: "rgba(0,0,0,0)", // พื้นหลังโปร่งใส
-  };
-
-  Plotly.newPlot("fully-skilled-pie-chart", chartData, layout).then(() => {
-      document
-        .getElementById("fully-skilled-pie-chart")
-        .on("plotly_click", this.onSliceClick);
-    });
-  },
-
-  onSliceClick(eventData) {
-  if (eventData.points && eventData.points.length > 0) {
-    const sliceLabel = eventData.points[0].label; // รับค่าที่คลิก
-    this.$emit("filter-skills", sliceLabel); // ส่งข้อมูลกลับไปที่ parent component
-  }
-},
-
-  },
-  watch: {
-    data: {
-      deep: true,
-      handler() {
-        this.drawChart();
-      },
-    },
-  },
-};
-</script>
 
 <style scoped>
 #fully-skilled-pie-chart {
   width: 100%;
   height: 100%;
+}
+
+.refresh-skill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: tomato;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 6px 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.refresh-skill-btn:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+.refresh-skill-btn .icon {
+  width: 18px;
+  height: 18px;
+  filter: invert(1);
 }
 </style>

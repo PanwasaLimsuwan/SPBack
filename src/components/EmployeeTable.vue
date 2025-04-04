@@ -8,7 +8,8 @@
           <th>EmpID</th>
           <th>Firstname</th>
           <th>Lastname</th>
-          <th class="datetime-column">Date-time</th>          <th>Gate No</th>
+          <th class="datetime-column">Date-time</th>
+          <th>Gate No</th>
           <th>Division</th>
           <th>Department</th>
           <th>Biz</th>
@@ -42,15 +43,24 @@
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   name: "EmployeeTable",
-  props: {
-    employees: {
-      type: Array,
-      required: true,
-    },
+  data() {
+    return {
+      employees: [], // เก็บข้อมูลพนักงานที่ดึงจาก API
+    };
   },
   methods: {
+    async fetchEmployees() {
+      try {
+        const response = await axios.get("http://localhost:5000/api/EmployeeInfo"); // ดึงข้อมูลพนักงานจาก API
+        this.employees = response.data; // กำหนดข้อมูลพนักงาน
+      } catch (error) {
+        console.error("Error fetching employee data:", error);
+      }
+    },
     getStatusClass(status) {
       return {
         "status-missing": status === "ขาดงาน",
@@ -58,52 +68,56 @@ export default {
         "status-in-cleanroom": status === "In Cleanroom",
       };
     },
+
     getDivisionClass(division) {
-  return {
-    "division-ism": division === "ISM",
-    "division-ddm": division === "DDM",
-    "division-ldm": division === "LDM",
-    "division-default": !division, // ใช้ default class ถ้าไม่มีค่า
-  };
-},
+      return {
+        "division-ism": division === "ISM",
+        "division-ddm": division === "DDM",
+        "division-ldm": division === "LDM",
+        "division-default": !division,
+      };
+    },
+  },
+  mounted() {
+    this.fetchEmployees(); // เรียกใช้งานเมื่อคอมโพเนนต์ถูกโหลด
   },
 };
 </script>
 
-  <style scoped>
-    .employee-table {
-      margin-top: 20px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th,
-    td {
-      padding: 10px;
-      text-align: center;
-      border: 1px solid #ddd;
-    }
-
-    th {
-      background-color: #f4f4f4;
-    }
-
-    .status-in-cleanroom {
-      color: green;
-    }
-
-    .status-out-cleanroom {
-      color: orange;
-    }
-
-    .status-missing {
-      color: red;
-    }
-
-    .datetime-column {
-  white-space: nowrap; /* ป้องกันการตัดข้อความ */
+<style scoped>
+.employee-table {
+  margin-top: 20px;
 }
-  </style>
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #f4f4f4;
+}
+
+.status-in-cleanroom {
+  color: green;
+}
+
+.status-out-cleanroom {
+  color: orange;
+}
+
+.status-missing {
+  color: red;
+}
+
+.datetime-column {
+  white-space: nowrap;
+}
+</style>

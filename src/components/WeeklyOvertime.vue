@@ -1,120 +1,111 @@
 <template>
-  <div id="overtime-chart"></div>
+  <div id="worktime-chart"></div>
 </template>
 
-<script>
-import Plotly from "plotly.js";
+<script setup>
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
+import Plotly from 'plotly.js';
 
-export default {
-  name: "WeeklyOvertime",
-  props: {
-    data: {
-      type: Array,
-      required: true,
+const workTimeData = ref([]);
+
+onMounted(async () => {
+  await fetchWorkTimeData();
+  updateChart();
+});
+
+const emit = defineEmits(['filter']);
+
+const fetchWorkTimeData = async () => {
+  try {
+    const response = await axios.get('http://localhost:5000/api/Worktime');
+    workTimeData.value = response.data;
+  } catch (error) {
+    console.error('Error fetching work time data:', error);
+  }
+};
+
+const updateChart = () => {
+  if (!workTimeData.value.length) {
+    console.error('No work time data found.');
+    return;
+  }
+
+  const { sortedWeeks, weeksFormatted, workTimeByWeek } = aggregateWorkTimeByWeek();
+  const otHours = sortedWeeks.map(week => workTimeByWeek[week].otHours);
+
+  const chartData = [
+    {
+      x: weeksFormatted,
+      y: otHours,
+      name: 'OT Hours',
+      type: 'bar',
+      marker: {
+        color: otHours.map(h => h >= 20 ? '#f44336' : h >= 10 ? '#ffc107' : '#4caf50'),
+      },
     },
-  },
-  mounted() {
-    this.drawChart();
-  },
-  methods: {
-    drawChart() {
-      // แยกข้อมูลจาก employees ตาม Process
-      const processData = this.aggregateDataByProcess(this.data);
+  ];
 
-      // สร้างข้อมูลกราฟตามสัปดาห์และ Process
-      const chartData = this.createChartData(processData);
+  const layout = {
+    title: 'Weekly OT Hours (Only OT)',
+    xaxis: { title: 'Week' },
+    yaxis: { title: 'Total OT Hours', rangemode: 'tozero' },
+    paper_bgcolor: '#fff',
+    plot_bgcolor: '#f9f9f9',
+    height: 400,
+    margin: { l: 60, r: 20, t: 50, b: 60 },
+  };
 
-      const layout = {
-        title: "Weekly Overtime (OT)",
-        barmode: "group", // แสดงกราฟแบบกลุ่ม
-        xaxis: { title: "Week", tickmode: "linear", dtick: 1 },
-        yaxis: { title: "WorkTime (Hours)", range: [0, 100] },
-        responsive: true,
-        height: 400,
-      };
+  Plotly.newPlot('worktime-chart', chartData, layout).then(() => {
+    document.getElementById('worktime-chart').addEventListener('plotly_click', onBarClick);
+  });
+};
 
-      Plotly.newPlot("overtime-chart", chartData, layout);
-    },
+const aggregateWorkTimeByWeek = () => {
+  const workTimeByWeek = {};
 
-    // ฟังก์ชันเพื่อรวบรวมข้อมูล WorkTime ตาม Process
-    aggregateDataByProcess(data) {
-      const processData = {};
+  workTimeData.value.forEach(entry => {
+    if (entry.status !== 'Active') return;
 
-      data.forEach(employee => {
-        const { Process, WorkTime, absentDates } = employee;
-        const weeks = this.getWeeksFromDates(absentDates); // คำนวณสัปดาห์จากวันที่ขาดงาน
+    const date = new Date(entry.date);
+    const weekNumber = getWeekNumber(date);
+    const weekKey = `${date.getFullYear()}-W${weekNumber}`;
 
-        if (!processData[Process]) {
-          processData[Process] = {};
-        }
+    if (!workTimeByWeek[weekKey]) {
+      workTimeByWeek[weekKey] = { otHours: 0 };
+    }
 
-        weeks.forEach(week => {
-          if (!processData[Process][week]) {
-            processData[Process][week] = 0;
-          }
-          processData[Process][week] += WorkTime; // คำนวณเวลาทำงานรวมตามสัปดาห์
-        });
-      });
+    workTimeByWeek[weekKey].otHours += entry.oT_Hours || 0;
+  });
 
-      return processData;
-    },
+  const sortedWeeks = Object.keys(workTimeByWeek).sort();
+  const weeksFormatted = sortedWeeks.map(week => {
+    const [year, weekNum] = week.split('-W');
+    return `Week ${weekNum}, ${year}`;
+  });
 
-    // ฟังก์ชันที่จะดึงข้อมูลสัปดาห์จากวันที่ขาดงาน (สามารถปรับปรุงได้)
-    getWeeksFromDates(absentDates) {
-      return absentDates.map(date => {
-        const dateObj = new Date(date);
-        const week = this.getWeekNumber(dateObj); // แปลงวันที่เป็นหมายเลขสัปดาห์
-        return week;
-      });
-    },
+  return { sortedWeeks, weeksFormatted, workTimeByWeek };
+};
 
-    // ฟังก์ชันเพื่อคำนวณหมายเลขสัปดาห์จากวันที่
-    getWeekNumber(date) {
-      const startDate = new Date(date.getFullYear(), 0, 1);
-      const diff = date - startDate;
-      const oneDay = 1000 * 60 * 60 * 24;
-      return Math.ceil(diff / oneDay / 7);
-    },
+const getWeekNumber = (date) => {
+  const startDate = new Date(date.getFullYear(), 0, 1);
+  const diff = date - startDate;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  return Math.ceil((dayOfYear + startDate.getDay() + 1) / 7);
+};
 
-    // สร้างข้อมูลสำหรับกราฟจากข้อมูลที่ได้
-    createChartData(processData) {
-      const chartData = [];
-      const weeks = this.getWeeksFromDates(this.data.flatMap(emp => emp.absentDates)); // ดึงสัปดาห์ทั้งหมด
-
-      Object.keys(processData).forEach(process => {
-        const overtimeData = weeks.map(week => {
-          return processData[process][week] || 0; // ถ้าไม่มีข้อมูล ให้เป็น 0
-        });
-
-        chartData.push({
-          x: weeks,
-          y: overtimeData,
-          type: "bar",
-          name: process,
-          marker: {
-            color: this.getRandomColor(),
-          },
-        });
-      });
-
-      return chartData;
-    },
-
-    // ฟังก์ชันสุ่มสี
-    getRandomColor() {
-      const letters = '0123456789ABCDEF';
-      let color = '#';
-      for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-      }
-      return color;
-    },
-  },
+const onBarClick = (eventData) => {
+  if (eventData.points?.length) {
+    const selectedWeek = eventData.points[0].x;
+    console.log('Clicked on week:', selectedWeek);
+    emit('filter', selectedWeek);
+  }
 };
 </script>
 
 <style scoped>
-#overtime-chart {
+#worktime-chart {
   width: 100%;
   height: 100%;
 }

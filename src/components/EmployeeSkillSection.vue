@@ -1,54 +1,73 @@
 <template>
-    <div v-if="employee" class="employee-section">
-      <h3>{{ employee.Firstname }} {{ employee.Lastname }}</h3>
-      <div v-for="skill in skills" :key="skill">
-        <p>{{ skill }}: Level {{ employee[skill] }}</p>
-        <div
-          class="skill-bar"
-          :style="{ 
-            background: `linear-gradient(to right, ${getSkillColor(employee[skill])} ${(employee[skill] / 3) * 100}%, #ddd ${(employee[skill] / 3) * 100}%)`,
-            width: '100%'
-          }"
-        ></div>
-      </div>
+  <div v-if="employee" class="employee-section">
+    <h3>{{ employee.firstName }} {{ employee.lastName }}</h3>
+    <div v-for="s in skillMap" :key="s.key" class="skill-row">
+      <p>{{ s.label }}: {{ getLevelLabel(employee[s.key]) }}</p>
+      <div class="skill-bar" :style="barStyle(employee[s.key])"></div>
     </div>
-    <p v-else>กรุณาเลือกพนักงาน</p>
-  </template>
-  
-  <script>
-  export default {
-    props: {
-      employee: {
-        type: Object,
-        required: true,
-      },
-      skills: {
-        type: Array,
-        required: true,
-      },
+  </div>
+</template>
+
+<script>
+export default {
+  name: "EmployeeSkillSection",
+  props: {
+    employee: { type: Object, required: true },
+  },
+  data() {
+    return {
+      skillMap: [
+        { key: "material", label: "Material" },
+        { key: "operation", label: "Operation" },
+        { key: "machineSAB1", label: "Machine:SAB#1" },
+        { key: "machineSAB2", label: "Machine:SAB#2" },
+        { key: "machineSAB3", label: "Machine:SAB#3" },
+        { key: "inspection", label: "Inspection" },
+      ],
+    };
+  },
+  methods: {
+    barStyle(level) {
+      const percent = (level / 3) * 100;
+      const colorMap = ["gray", "red", "yellow", "green"];
+      const color = colorMap[level] || "gray";
+      return {
+        background: `linear-gradient(to right, ${color} ${percent}%, #ddd ${percent}%)`,
+      };
     },
-    methods: {
-      getSkillColor(level) {
-        if (level === 3) return "green";
-        if (level === 2) return "yellow";
-        if (level === 1) return "red";
-        if (level === 0) return "gray";
-        return "transparent";
-      },
+    getLevelLabel(level) {
+      return ["Not Trained", "Basic", "Medium", "Expert"][level] ?? "Unknown";
     },
-  };
-  </script>
-  
-  <style scoped>
-  .employee-section {
-    margin-top: 20px;
-  }
-  
-  .skill-bar {
-    height: 20px;
-    margin-bottom: 10px;
-    border-radius: 5px;
-    background-color: gray; /* Default */
-  }
-  </style>
-  
+  },
+};
+</script>
+
+<style scoped>
+.employee-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.skill-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.skill-bar {
+  height: 10px;
+  border-radius: 6px;
+  background-color: gray;
+  transition: width 0.3s ease;
+}
+
+h3 {
+  margin-bottom: 15px;
+}
+</style>

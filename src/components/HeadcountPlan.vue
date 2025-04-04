@@ -1,51 +1,65 @@
 <template>
-    <div id="headcount-chart"></div>
-  </template>
-  
-  <script>
-  import Plotly from "plotly.js";
-  
-  export default {
-    name: "HeadcountPlan",
-    props: {
-      data: Object,
+  <div id="headcount-chart"></div>
+</template>
+
+<script>
+import axios from "axios";
+import Plotly from "plotly.js";
+
+export default {
+  name: "HeadcountPlan",
+  data() {
+    return {
+      headcountData: [],
+    };
+  },
+  mounted() {
+    this.fetchData();
+  },
+  methods: {
+    async fetchData() {
+      try {
+        const response = await axios.get("http://localhost:5000/api/ManpowerPlan"); // เปลี่ยนเป็น API จริง
+        this.headcountData = response.data;
+        this.drawChart();
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
     },
-    mounted() {
-      this.drawChart();
+    drawChart() {
+      if (!this.headcountData.length) return;
+      
+      const dates = this.headcountData.map(item => item.date);
+      const planned = this.headcountData.map(item => item.plannedHeadcount);
+      const actual = this.headcountData.map(item => item.actualHeadcount);
+      
+      const chartData = [
+        {
+          x: dates,
+          y: planned,
+          type: "bar",
+          name: "Planned Headcount",
+          marker: { color: "red" },
+        },
+        {
+          x: dates,
+          y: actual,
+          type: "bar",
+          name: "Actual Headcount",
+          marker: { color: "blue" },
+        },
+      ];
+
+      const layout = {
+        title: "Headcount vs Plan",
+        barmode: "group",
+        xaxis: { title: "Date", tickangle: -45 },
+        yaxis: { title: "Headcount" },
+        responsive: true,
+      };
+
+      Plotly.newPlot("headcount-chart", chartData, layout);
     },
-    methods: {
-      drawChart() {
-        const { processes, headcount, plan } = this.data;
-  
-        const chartData = [
-          {
-            x: processes,
-            y: headcount,
-            type: "bar",
-            name: "Headcount",
-            marker: { color: "blue" },
-          },
-          {
-            x: processes,
-            y: plan,
-            type: "bar",
-            name: "Plan",
-            marker: { color: "red" },
-          },
-        ];
-  
-        const layout = {
-          title: "Headcount vs Plan",
-          barmode: "group",
-          height: 300,
-          xaxis: { title: "Process" },
-          yaxis: { title: "Count", range: [0, 250] },
-          responsive: true,
-        };
-  
-        Plotly.newPlot("headcount-chart", chartData, layout);
-      },
-    },
-  };
-  </script>
-  
+  },
+};
+</script>

@@ -2,118 +2,90 @@
   <div id="weekly-absent-trend"></div>
 </template>
 
-<script>
-import Plotly from "plotly.js";
+<script setup>
+import { ref, onMounted } from 'vue';
+import Plotly from 'plotly.js';
+import axios from 'axios';
 
-export default {
-  name: "WeeklyAbsentTrend",
-  props: {
-    data: {
-      type: Array,
-      required: true,
-    },
-  },
-  mounted() {
-    this.drawChart();
-  },
-  watch: {
-    data: {
-      deep: true,
-      handler() {
-        this.drawChart();
-      },
-    },
-  },
-  methods: {
-    calculateProcessedData() {
-      console.log("🔍 Data received:", this.data);
+const absentData = ref([]);
 
-      if (!Array.isArray(this.data)) {
-        console.error("🚨 Expected an array but received:", this.data);
-        return { weeks: [], processes: {} };
+onMounted(async () => {
+  await fetchAbsentData();
+  drawChart(); // เรียกใช้ชื่อฟังก์ชันใหม่
+});
+
+const fetchAbsentData = async () => {
+  try {
+    const res = await axios.get('http://localhost:5000/api/GateEntry');
+    absentData.value = extractAbsentDates(res.data);
+  } catch (err) {
+    console.error('❌ Error fetching absent data:', err);
+  }
+};
+
+const extractAbsentDates = (data) => {
+  return data.map(emp => {
+    const absentDates = [];
+
+    if (emp.status === 'status-missing' && emp.entryDateTime) {
+      const fixedDate = emp.entryDateTime.replace(/-/g, '/');
+      const dateObj = new Date(fixedDate);
+      if (!isNaN(dateObj)) {
+        absentDates.push(dateObj);
       }
+    }
 
-      let processes = {};
-      let weeksSet = new Set();
+    return { ...emp, absentDates };
+  });
+};
 
-      // ดึง process ที่ไม่ซ้ำจาก employee data
-      let uniqueProcesses = [...new Set(this.data.map(emp => emp.Process))];
-      uniqueProcesses.forEach(process => {
-        processes[process] = {};
-      });
+const getWeekNumber = (date) => {
+  const startDate = new Date(date.getFullYear(), 0, 1);
+  const diff = date - startDate;
+  const oneDay = 1000 * 60 * 60 * 24;
+  return Math.ceil(diff / oneDay / 7);
+};
 
-      // ตรวจสอบการขาดงานของพนักงานแต่ละคน
-      this.data.forEach(employee => {
-        if (Array.isArray(employee.absentDates)) {
-          employee.absentDates.forEach(absentDate => {
-            let date = new Date(absentDate);
-            if (isNaN(date.getTime())) {
-              date = new Date(absentDate.replace(/-/g, "/")); // รองรับฟอร์แมตที่ผิด
-            }
+const drawChart = () => {
+  const weeklyCount = {};
+  const weeksSet = new Set();
 
-            if (!isNaN(date.getTime())) {
-              let week = this.getWeekNumber(date);
-              weeksSet.add(week);
+  absentData.value.forEach(emp => {
+    emp.absentDates.forEach(date => {
+      const week = getWeekNumber(date);
+      weeksSet.add(week);
+      if (!weeklyCount[week]) weeklyCount[week] = 0;
+      weeklyCount[week]++;
+    });
+  });
 
-              if (!processes[employee.Process][week]) {
-                processes[employee.Process][week] = 0;
-              }
-              processes[employee.Process][week]++;
-            }
-          });
-        }
-      });
+  const sortedWeeks = Array.from(weeksSet).sort((a, b) => a - b);
+  const weeksFormatted = sortedWeeks.map(w => `Week ${w}`);
+  const counts = sortedWeeks.map(w => weeklyCount[w] || 0);
 
-      let weeks = Array.from(weeksSet).sort((a, b) => a - b);
-      console.log("📊 Processed data:", processes);
-
-      return { weeks, processes };
+  const trace = {
+    x: weeksFormatted,
+    y: counts,
+    type: 'bar',
+    name: 'Total Absences',
+    marker: {
+      color: counts.map(c => c >= 10 ? '#f44336' : c >= 5 ? '#ffc107' : '#4caf50'),
     },
+  };
 
-    drawChart() {
-      const { weeks, processes } = this.calculateProcessedData();
+  const layout = {
+    title: 'Weekly Absent',
+    barmode: 'group',
+    height: 400,
+    xaxis: { title: 'Week Number', dtick: 1 },
+    yaxis: { title: 'Total Absences', dtick: 1 },
+    paper_bgcolor: '#fff',
+    plot_bgcolor: '#f9f9f9',
+    legend: { orientation: 'h', x: 0.5, xanchor: 'center', y: 1.1 },
+    margin: { l: 60, r: 20, t: 50, b: 60 },
+  };
 
-      if (Object.keys(processes).length === 0 || weeks.length === 0) {
-        console.warn("⚠️ No data available for plotting");
-        return;
-      }
-
-      let traces = Object.keys(processes).map(process => {
-        return {
-          x: weeks,
-          y: weeks.map(week => processes[process][week] || 0), // ถ้าไม่มีข้อมูลให้เป็น 0
-          type: "bar",
-          name: process,
-        };
-      });
-
-      const maxAbsences = Math.max(...Object.values(processes).flat().map(weekData => Math.max(...Object.values(weekData)))) + 2;
-
-      const layout = {
-        title: "Weekly Absent Trend by Process",
-        height: 400,
-        barmode: "group",
-        xaxis: { title: "Week Number", tickmode: "linear", dtick: 1 },
-        yaxis: {
-          title: "Absences",
-          range: [0, maxAbsences > 0 ? maxAbsences : 5],
-          dtick: 1,
-        },
-        legend: { orientation: "h", x: 0.5, xanchor: "center", y: 1.1 },
-        responsive: true,
-      };
-
-      Plotly.newPlot("weekly-absent-trend", traces, layout);
-    },
-
-    // ฟังก์ชันคำนวณหมายเลขสัปดาห์ของปี
-    getWeekNumber(date) {
-      const startDate = new Date(date.getFullYear(), 0, 1);
-      const diff = date - startDate;
-      const oneDay = 1000 * 60 * 60 * 24;
-      return Math.ceil(diff / oneDay / 7);
-    },
-  },
+  Plotly.newPlot('weekly-absent-trend', [trace], layout);
 };
 </script>
 

@@ -19,63 +19,117 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/OJTandInspectionSkill
+        // ✅ GET: api/OJTandInspectionSkill (With Join EmployeeInfo)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var result = new List<OJTandInspectionSkill>();
+            var result = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM OJTandInspectionSkill", conn);
-                var reader = await cmd.ExecuteReaderAsync();
 
-                while (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        o.CourseNo,
+                        o.CourseGroup,
+                        o.Biz,
+                        o.Process,
+                        o.CerNo,
+                        o.Active,
+                        o.SkillGroup,
+                        o.EmpID,
+                        e.Division,
+                        e.Department,
+                        e.Section,
+                        e.Biz AS EmployeeBiz,
+                        e.Process AS EmployeeProcess
+                    FROM OJTandInspectionSkill o
+                    LEFT JOIN EmployeeInfo e ON o.EmpID = e.EmpID";
+
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = await cmd.ExecuteReaderAsync())
                 {
-                    result.Add(new OJTandInspectionSkill
+                    while (await reader.ReadAsync())
                     {
-                        CourseNo = reader.GetString(0),
-                        CourseGroup = reader.IsDBNull(1) ? null : reader.GetString(1),
-                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        CerNo = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        Active = reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                        SkillGroup = reader.IsDBNull(6) ? null : reader.GetString(6),
-                        EmpID = reader.IsDBNull(7) ? null : reader.GetString(7)
-                    });
+                        result.Add(new
+                        {
+                            courseNo = reader["CourseNo"]?.ToString(),
+                            courseGroup = reader["CourseGroup"]?.ToString(),
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString(),
+                            cerNo = reader["CerNo"]?.ToString(),
+                            active = reader["Active"] == DBNull.Value ? null : (int?)reader["Active"],
+                            skillGroup = reader["SkillGroup"]?.ToString(),
+                            empID = reader["EmpID"]?.ToString(),
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            employeeBiz = reader["EmployeeBiz"]?.ToString(),
+                            employeeProcess = reader["EmployeeProcess"]?.ToString()
+                        });
+                    }
                 }
             }
 
             return Ok(result);
         }
 
-        // GET: api/OJTandInspectionSkill/{courseNo}
+        // ✅ GET: api/OJTandInspectionSkill/{courseNo} (With Join EmployeeInfo)
         [HttpGet("{courseNo}")]
         public async Task<IActionResult> GetByCourseNo(string courseNo)
         {
-            OJTandInspectionSkill skill = null;
+            object skill = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM OJTandInspectionSkill WHERE CourseNo = @courseNo", conn);
-                cmd.Parameters.AddWithValue("@courseNo", courseNo);
 
-                var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        o.CourseNo,
+                        o.CourseGroup,
+                        o.Biz,
+                        o.Process,
+                        o.CerNo,
+                        o.Active,
+                        o.SkillGroup,
+                        o.EmpID,
+                        e.Division,
+                        e.Department,
+                        e.Section,
+                        e.Biz AS EmployeeBiz,
+                        e.Process AS EmployeeProcess
+                    FROM OJTandInspectionSkill o
+                    LEFT JOIN EmployeeInfo e ON o.EmpID = e.EmpID
+                    WHERE o.CourseNo = @CourseNo";
+
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    skill = new OJTandInspectionSkill
+                    cmd.Parameters.AddWithValue("@CourseNo", courseNo);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        CourseNo = reader.GetString(0),
-                        CourseGroup = reader.IsDBNull(1) ? null : reader.GetString(1),
-                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        CerNo = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        Active = reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                        SkillGroup = reader.IsDBNull(6) ? null : reader.GetString(6),
-                        EmpID = reader.IsDBNull(7) ? null : reader.GetString(7)
-                    };
+                        if (await reader.ReadAsync())
+                        {
+                            skill = new
+                            {
+                                courseNo = reader["CourseNo"]?.ToString(),
+                                courseGroup = reader["CourseGroup"]?.ToString(),
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString(),
+                                cerNo = reader["CerNo"]?.ToString(),
+                                active = reader["Active"] == DBNull.Value ? null : (int?)reader["Active"],
+                                skillGroup = reader["SkillGroup"]?.ToString(),
+                                empID = reader["EmpID"]?.ToString(),
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                employeeBiz = reader["EmployeeBiz"]?.ToString(),
+                                employeeProcess = reader["EmployeeProcess"]?.ToString()
+                            };
+                        }
+                    }
                 }
             }
 

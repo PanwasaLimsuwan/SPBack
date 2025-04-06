@@ -22,29 +22,41 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllAttendance()
         {
-            var result = new List<Attendance>();
+            var result = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var query = "SELECT * FROM Attendance";
+
+                var query = @"
+                    SELECT 
+                        a.AttendanceID, a.EmpID, a.Date, a.CheckInTime, a.CheckOutTime,
+                        a.ScheduledStartTime, a.ScheduledEndTime, a.Status, a.WeekNumber,
+                        e.Division, e.Department, e.Section, e.Biz, e.Process
+                    FROM Attendance a
+                    JOIN EmployeeInfo e ON a.EmpID = CAST(e.EmpID AS VARCHAR)";
 
                 using (var cmd = new SqlCommand(query, conn))
                 using (var reader = await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
-                        result.Add(new Attendance
+                        result.Add(new
                         {
-                            AttendanceID = Convert.ToInt32(reader["AttendanceID"]),
-                            EmpID = reader["EmpID"].ToString(),
-                            Date = reader["Date"] as DateTime?,
-                            CheckInTime = reader["CheckInTime"] as TimeSpan?,
-                            CheckOutTime = reader["CheckOutTime"] as TimeSpan?,
-                            ScheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
-                            ScheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
-                            Status = reader["Status"]?.ToString(),
-                            WeekNumber = reader["WeekNumber"] as int?
+                            attendanceID = Convert.ToInt32(reader["AttendanceID"]),
+                            empID = reader["EmpID"].ToString(),
+                            date = reader["Date"] as DateTime?,
+                            checkInTime = reader["CheckInTime"] as TimeSpan?,
+                            checkOutTime = reader["CheckOutTime"] as TimeSpan?,
+                            scheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
+                            scheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
+                            status = reader["Status"]?.ToString(),
+                            weekNumber = reader["WeekNumber"] as int?,
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString()
                         });
                     }
                 }
@@ -56,12 +68,21 @@ namespace Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAttendanceById(int id)
         {
-            Attendance attendance = null;
+            object attendance = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var query = "SELECT * FROM Attendance WHERE AttendanceID = @id";
+
+                var query = @"
+                    SELECT 
+                        a.AttendanceID, a.EmpID, a.Date, a.CheckInTime, a.CheckOutTime,
+                        a.ScheduledStartTime, a.ScheduledEndTime, a.Status, a.WeekNumber,
+                        e.Division, e.Department, e.Section, e.Biz, e.Process
+                    FROM Attendance a
+                    JOIN EmployeeInfo e ON a.EmpID = CAST(e.EmpID AS VARCHAR)
+                    WHERE a.AttendanceID = @id";
+
                 using (var cmd = new SqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@id", id);
@@ -70,17 +91,22 @@ namespace Api.Controllers
                     {
                         if (await reader.ReadAsync())
                         {
-                            attendance = new Attendance
+                            attendance = new
                             {
-                                AttendanceID = Convert.ToInt32(reader["AttendanceID"]),
-                                EmpID = reader["EmpID"].ToString(),
-                                Date = reader["Date"] as DateTime?,
-                                CheckInTime = reader["CheckInTime"] as TimeSpan?,
-                                CheckOutTime = reader["CheckOutTime"] as TimeSpan?,
-                                ScheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
-                                ScheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
-                                Status = reader["Status"]?.ToString(),
-                                WeekNumber = reader["WeekNumber"] as int?
+                                attendanceID = Convert.ToInt32(reader["AttendanceID"]),
+                                empID = reader["EmpID"].ToString(),
+                                date = reader["Date"] as DateTime?,
+                                checkInTime = reader["CheckInTime"] as TimeSpan?,
+                                checkOutTime = reader["CheckOutTime"] as TimeSpan?,
+                                scheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
+                                scheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
+                                status = reader["Status"]?.ToString(),
+                                weekNumber = reader["WeekNumber"] as int?,
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString()
                             };
                         }
                     }

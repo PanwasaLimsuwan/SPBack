@@ -37,11 +37,11 @@ namespace Api.Controllers
                     {
                         WorkTimeID = reader.GetInt32(0),
                         EmpID = reader.GetString(1),
-                        Date = reader.IsDBNull(2) ? null : reader.GetDateTime(2),
-                        WorkedHours = reader.IsDBNull(3) ? null : reader.GetFloat(3),
-                        OT_Hours = reader.IsDBNull(4) ? null : reader.GetFloat(4),
-                        EICC_Hours = reader.IsDBNull(5) ? null : reader.GetFloat(5),
-                        OverloadHours = reader.IsDBNull(6) ? null : reader.GetFloat(6),
+                        Date = reader.IsDBNull(2) ? (DateTime?)null : reader.GetDateTime(2),
+                        WorkedHours = reader.IsDBNull(3) ? (float?)null : reader.GetFloat(3),
+                        OT_Hours = reader.IsDBNull(4) ? (float?)null : reader.GetFloat(4),
+                        EICC_Hours = reader.IsDBNull(5) ? (float?)null : reader.GetFloat(5),
+                        OverloadHours = reader.IsDBNull(6) ? (float?)null : reader.GetFloat(6),
                         Status = reader.GetString(7)
                     });
                 }
@@ -69,11 +69,11 @@ namespace Api.Controllers
                     {
                         WorkTimeID = reader.GetInt32(0),
                         EmpID = reader.GetString(1),
-                        Date = reader.IsDBNull(2) ? null : reader.GetDateTime(2),
-                        WorkedHours = reader.IsDBNull(3) ? null : reader.GetFloat(3),
-                        OT_Hours = reader.IsDBNull(4) ? null : reader.GetFloat(4),
-                        EICC_Hours = reader.IsDBNull(5) ? null : reader.GetFloat(5),
-                        OverloadHours = reader.IsDBNull(6) ? null : reader.GetFloat(6),
+                        Date = reader.IsDBNull(2) ? (DateTime?)null : reader.GetDateTime(2),
+                        WorkedHours = reader.IsDBNull(3) ? (float?)null : reader.GetFloat(3),
+                        OT_Hours = reader.IsDBNull(4) ? (float?)null : reader.GetFloat(4),
+                        EICC_Hours = reader.IsDBNull(5) ? (float?)null : reader.GetFloat(5),
+                        OverloadHours = reader.IsDBNull(6) ? (float?)null : reader.GetFloat(6),
                         Status = reader.GetString(7)
                     };
                 }

@@ -19,56 +19,101 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/HeadcountTransition
+        // ✅ GET: api/HeadcountTransition (แบบ Join EmployeeInfo)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var transitions = new List<HeadcountTransition>();
+            var transitions = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM HeadcountTransition", conn);
-                var reader = await cmd.ExecuteReaderAsync();
 
-                while (await reader.ReadAsync())
-{
-    transitions.Add(new HeadcountTransition
-    {
-        Id = (int)reader["Id"],
-        DateTime = (DateTime)reader["DateTime"],
-        TransType = reader["TransType"]?.ToString(),
-        EmpID = reader["EmpID"]?.ToString()
-    });
-}
+                var query = @"
+                    SELECT 
+                        ht.Id,
+                        ht.DateTime,
+                        ht.TransType,
+                        ht.EmpID,
+                        ei.Division,
+                        ei.Department,
+                        ei.Section,
+                        ei.Biz,
+                        ei.Process
+                    FROM HeadcountTransition ht
+                    LEFT JOIN EmployeeInfo ei ON ht.EmpID = ei.EmpID";
 
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        transitions.Add(new
+                        {
+                            id = reader["Id"],
+                            dateTime = reader["DateTime"],
+                            transType = reader["TransType"]?.ToString(),
+                            empID = reader["EmpID"]?.ToString(),
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString()
+                        });
+                    }
+                }
             }
 
             return Ok(transitions);
         }
 
-        // GET: api/HeadcountTransition/{id}
+        // ✅ GET: api/HeadcountTransition/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            HeadcountTransition transition = null;
+            object transition = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM HeadcountTransition WHERE Id = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
 
-                var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        ht.Id,
+                        ht.DateTime,
+                        ht.TransType,
+                        ht.EmpID,
+                        ei.Division,
+                        ei.Department,
+                        ei.Section,
+                        ei.Biz,
+                        ei.Process
+                    FROM HeadcountTransition ht
+                    LEFT JOIN EmployeeInfo ei ON ht.EmpID = ei.EmpID
+                    WHERE ht.Id = @id";
+
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    transition = new HeadcountTransition
+                    cmd.Parameters.AddWithValue("@id", id);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        Id = reader.GetInt32(0),
-                        DateTime = reader.GetDateTime(1),
-                        TransType = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        EmpID = reader.IsDBNull(3) ? null : reader.GetString(3)
-                    };
+                        if (await reader.ReadAsync())
+                        {
+                            transition = new
+                            {
+                                id = reader["Id"],
+                                dateTime = reader["DateTime"],
+                                transType = reader["TransType"]?.ToString(),
+                                empID = reader["EmpID"]?.ToString(),
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString()
+                            };
+                        }
+                    }
                 }
             }
 
@@ -78,7 +123,7 @@ namespace Api.Controllers
             return Ok(transition);
         }
 
-        // POST: api/HeadcountTransition
+        // ✅ POST: api/HeadcountTransition
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] HeadcountTransition transition)
         {
@@ -99,7 +144,7 @@ namespace Api.Controllers
             return Ok("Created");
         }
 
-        // PUT: api/HeadcountTransition/{id}
+        // ✅ PUT: api/HeadcountTransition/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] HeadcountTransition transition)
         {
@@ -126,7 +171,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
-        // DELETE: api/HeadcountTransition/{id}
+        // ✅ DELETE: api/HeadcountTransition/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

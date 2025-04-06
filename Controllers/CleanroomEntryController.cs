@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
 using Api.Models;
@@ -23,26 +22,39 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllCleanroomEntries()
         {
-            var entries = new List<CleanroomEntry>();
+            var entries = new List<object>();
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                string query = "SELECT * FROM CleanroomEntry";
+
+                string query = @"
+                    SELECT 
+                        c.CEntryID, c.EmpID, c.CheckInDateTime, c.CheckOutDateTime, 
+                        c.LocationStatus, c.HeadCountDate, c.CStatus,
+                        e.Division, e.Department, e.Section, e.Biz, e.Process
+                    FROM CleanroomEntry c
+                    JOIN EmployeeInfo e ON c.EmpID = CAST(e.EmpID AS VARCHAR)";
+
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
-                        entries.Add(new CleanroomEntry
+                        entries.Add(new
                         {
-                            CEntryID = Convert.ToInt32(reader["CEntryID"]),
-                            EmpID = reader["EmpID"].ToString(),
-                            CheckInDateTime = reader["CheckInDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckInDateTime"],
-                            CheckOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckOutDateTime"],
-                            LocationStatus = reader["LocationStatus"].ToString(),
-                            HeadCountDate = reader["HeadCountDate"] == DBNull.Value ? null : (DateTime?)reader["HeadCountDate"],
-                            CStatus = reader["CStatus"].ToString()
+                            cEntryID = Convert.ToInt32(reader["CEntryID"]),
+                            empID = reader["EmpID"].ToString(),
+                            checkInDateTime = reader["CheckInDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckInDateTime"],
+                            checkOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckOutDateTime"],
+                            locationStatus = reader["LocationStatus"]?.ToString(),
+                            headCountDate = reader["HeadCountDate"] == DBNull.Value ? null : (DateTime?)reader["HeadCountDate"],
+                            cStatus = reader["CStatus"]?.ToString(),
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString()
                         });
                     }
                 }
@@ -54,35 +66,53 @@ namespace Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCleanroomEntryById(int id)
         {
-            CleanroomEntry entry = null;
+            object entry = null;
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                string query = "SELECT * FROM CleanroomEntry WHERE CEntryID = @id";
+
+                string query = @"
+                    SELECT 
+                        c.CEntryID, c.EmpID, c.CheckInDateTime, c.CheckOutDateTime, 
+                        c.LocationStatus, c.HeadCountDate, c.CStatus,
+                        e.Division, e.Department, e.Section, e.Biz, e.Process
+                    FROM CleanroomEntry c
+                    JOIN EmployeeInfo e ON c.EmpID = CAST(e.EmpID AS VARCHAR)
+                    WHERE c.CEntryID = @id";
+
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@id", id);
+
                     using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            entry = new CleanroomEntry
+                            entry = new
                             {
-                                CEntryID = Convert.ToInt32(reader["CEntryID"]),
-                                EmpID = reader["EmpID"].ToString(),
-                                CheckInDateTime = reader["CheckInDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckInDateTime"],
-                                CheckOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckOutDateTime"],
-                                LocationStatus = reader["LocationStatus"].ToString(),
-                                HeadCountDate = reader["HeadCountDate"] == DBNull.Value ? null : (DateTime?)reader["HeadCountDate"],
-                                CStatus = reader["CStatus"].ToString()
+                                cEntryID = Convert.ToInt32(reader["CEntryID"]),
+                                empID = reader["EmpID"].ToString(),
+                                checkInDateTime = reader["CheckInDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckInDateTime"],
+                                checkOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? null : (DateTime?)reader["CheckOutDateTime"],
+                                locationStatus = reader["LocationStatus"]?.ToString(),
+                                headCountDate = reader["HeadCountDate"] == DBNull.Value ? null : (DateTime?)reader["HeadCountDate"],
+                                cStatus = reader["CStatus"]?.ToString(),
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString()
                             };
                         }
                     }
                 }
             }
 
-            return entry == null ? NotFound() : Ok(entry);
+            if (entry == null)
+                return NotFound();
+
+            return Ok(entry);
         }
 
         [HttpPost]
@@ -91,8 +121,13 @@ namespace Api.Controllers
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                string query = @"INSERT INTO CleanroomEntry (EmpID, CheckInDateTime, CheckOutDateTime, LocationStatus, HeadCountDate, CStatus)
-                                 VALUES (@EmpID, @CheckInDateTime, @CheckOutDateTime, @LocationStatus, @HeadCountDate, @CStatus)";
+
+                string query = @"
+                    INSERT INTO CleanroomEntry 
+                        (EmpID, CheckInDateTime, CheckOutDateTime, LocationStatus, HeadCountDate, CStatus)
+                    VALUES 
+                        (@EmpID, @CheckInDateTime, @CheckOutDateTime, @LocationStatus, @HeadCountDate, @CStatus)";
+
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@EmpID", entry.EmpID);
@@ -115,10 +150,18 @@ namespace Api.Controllers
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                string query = @"UPDATE CleanroomEntry 
-                                 SET EmpID = @EmpID, CheckInDateTime = @CheckInDateTime, CheckOutDateTime = @CheckOutDateTime, 
-                                     LocationStatus = @LocationStatus, HeadCountDate = @HeadCountDate, CStatus = @CStatus 
-                                 WHERE CEntryID = @id";
+
+                string query = @"
+                    UPDATE CleanroomEntry 
+                    SET 
+                        EmpID = @EmpID, 
+                        CheckInDateTime = @CheckInDateTime, 
+                        CheckOutDateTime = @CheckOutDateTime, 
+                        LocationStatus = @LocationStatus, 
+                        HeadCountDate = @HeadCountDate, 
+                        CStatus = @CStatus 
+                    WHERE CEntryID = @id";
+
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@id", id);
@@ -142,7 +185,9 @@ namespace Api.Controllers
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
+
                 string query = "DELETE FROM CleanroomEntry WHERE CEntryID = @id";
+
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@id", id);

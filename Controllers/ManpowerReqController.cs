@@ -19,59 +19,109 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/ManpowerReq
+        // ✅ GET: api/ManpowerReq (พร้อม Join EmployeeInfo)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var result = new List<ManpowerReq>();
+            var result = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM ManpowerReq", conn);
-                var reader = await cmd.ExecuteReaderAsync();
 
-                while (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        m.MPRID,
+                        m.Date,
+                        m.Biz,
+                        m.Process,
+                        m.Require,
+                        m.SkillGroup,
+                        e.Division,
+                        e.Department,
+                        e.Section,
+                        e.Biz AS EmployeeBiz,
+                        e.Process AS EmployeeProcess
+                    FROM ManpowerReq m
+                    LEFT JOIN EmployeeInfo e ON m.Biz = e.Biz AND m.Process = e.Process";
+
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = await cmd.ExecuteReaderAsync())
                 {
-                    result.Add(new ManpowerReq
+                    while (await reader.ReadAsync())
                     {
-                        MPRID = reader.GetString(0),
-                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        Require = reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                        SkillGroup = reader.IsDBNull(5) ? null : reader.GetString(5)
-                    });
+                        result.Add(new
+                        {
+                            mprID = reader["MPRID"]?.ToString(),
+                            date = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString(),
+                            require = reader["Require"] == DBNull.Value ? null : (int?)reader["Require"],
+                            skillGroup = reader["SkillGroup"]?.ToString(),
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            employeeBiz = reader["EmployeeBiz"]?.ToString(),
+                            employeeProcess = reader["EmployeeProcess"]?.ToString()
+                        });
+                    }
                 }
             }
 
             return Ok(result);
         }
 
-        // GET: api/ManpowerReq/{id}
+        // ✅ GET: api/ManpowerReq/{id} (พร้อม Join EmployeeInfo)
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(string id)
         {
-            ManpowerReq req = null;
+            object req = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM ManpowerReq WHERE MPRID = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
 
-                var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        m.MPRID,
+                        m.Date,
+                        m.Biz,
+                        m.Process,
+                        m.Require,
+                        m.SkillGroup,
+                        e.Division,
+                        e.Department,
+                        e.Section,
+                        e.Biz AS EmployeeBiz,
+                        e.Process AS EmployeeProcess
+                    FROM ManpowerReq m
+                    LEFT JOIN EmployeeInfo e ON m.Biz = e.Biz AND m.Process = e.Process
+                    WHERE m.MPRID = @id";
+
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    req = new ManpowerReq
+                    cmd.Parameters.AddWithValue("@id", id);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        MPRID = reader.GetString(0),
-                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                        Biz = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Process = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        Require = reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                        SkillGroup = reader.IsDBNull(5) ? null : reader.GetString(5)
-                    };
+                        if (await reader.ReadAsync())
+                        {
+                            req = new
+                            {
+                                mprID = reader["MPRID"]?.ToString(),
+                                date = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString(),
+                                require = reader["Require"] == DBNull.Value ? null : (int?)reader["Require"],
+                                skillGroup = reader["SkillGroup"]?.ToString(),
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                employeeBiz = reader["EmployeeBiz"]?.ToString(),
+                                employeeProcess = reader["EmployeeProcess"]?.ToString()
+                            };
+                        }
+                    }
                 }
             }
 

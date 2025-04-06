@@ -19,63 +19,117 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/ManpowerPlan
+        // ✅ GET: api/ManpowerPlan (แบบ Join EmployeeInfo)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var plans = new List<ManpowerPlan>();
+            var plans = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM ManpowerPlan", conn);
-                var reader = await cmd.ExecuteReaderAsync();
 
-                while (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        mp.PlanID,
+                        mp.Date,
+                        mp.EmpID,
+                        mp.Attendance,
+                        mp.ShiftCode,
+                        mp.Shift,
+                        mp.PlannedHeadcount,
+                        mp.ActualHeadcount,
+                        ei.Division,
+                        ei.Department,
+                        ei.Section,
+                        ei.Biz,
+                        ei.Process
+                    FROM ManpowerPlan mp
+                    LEFT JOIN EmployeeInfo ei ON mp.EmpID = ei.EmpID";
+
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = await cmd.ExecuteReaderAsync())
                 {
-                    plans.Add(new ManpowerPlan
+                    while (await reader.ReadAsync())
                     {
-                        PlanID = reader.GetInt32(0),
-                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                        EmpID = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Attendance = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        ShiftCode = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        Shift = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        PlannedHeadcount = reader.IsDBNull(6) ? null : reader.GetInt32(6),
-                        ActualHeadcount = reader.IsDBNull(7) ? null : reader.GetInt32(7)
-                    });
+                        plans.Add(new
+                        {
+                            planID = reader["PlanID"],
+                            date = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
+                            empID = reader["EmpID"]?.ToString(),
+                            attendance = reader["Attendance"]?.ToString(),
+                            shiftCode = reader["ShiftCode"]?.ToString(),
+                            shift = reader["Shift"]?.ToString(),
+                            plannedHeadcount = reader["PlannedHeadcount"] == DBNull.Value ? null : (int?)reader["PlannedHeadcount"],
+                            actualHeadcount = reader["ActualHeadcount"] == DBNull.Value ? null : (int?)reader["ActualHeadcount"],
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString()
+                        });
+                    }
                 }
             }
 
             return Ok(plans);
         }
 
-        // GET: api/ManpowerPlan/{id}
+        // ✅ GET: api/ManpowerPlan/{id} (แบบ Join EmployeeInfo)
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            ManpowerPlan plan = null;
+            object plan = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM ManpowerPlan WHERE PlanID = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
 
-                var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        mp.PlanID,
+                        mp.Date,
+                        mp.EmpID,
+                        mp.Attendance,
+                        mp.ShiftCode,
+                        mp.Shift,
+                        mp.PlannedHeadcount,
+                        mp.ActualHeadcount,
+                        ei.Division,
+                        ei.Department,
+                        ei.Section,
+                        ei.Biz,
+                        ei.Process
+                    FROM ManpowerPlan mp
+                    LEFT JOIN EmployeeInfo ei ON mp.EmpID = ei.EmpID
+                    WHERE mp.PlanID = @id";
+
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    plan = new ManpowerPlan
+                    cmd.Parameters.AddWithValue("@id", id);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        PlanID = reader.GetInt32(0),
-                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                        EmpID = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Attendance = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        ShiftCode = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        Shift = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        PlannedHeadcount = reader.IsDBNull(6) ? null : reader.GetInt32(6),
-                        ActualHeadcount = reader.IsDBNull(7) ? null : reader.GetInt32(7)
-                    };
+                        if (await reader.ReadAsync())
+                        {
+                            plan = new
+                            {
+                                planID = reader["PlanID"],
+                                date = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
+                                empID = reader["EmpID"]?.ToString(),
+                                attendance = reader["Attendance"]?.ToString(),
+                                shiftCode = reader["ShiftCode"]?.ToString(),
+                                shift = reader["Shift"]?.ToString(),
+                                plannedHeadcount = reader["PlannedHeadcount"] == DBNull.Value ? null : (int?)reader["PlannedHeadcount"],
+                                actualHeadcount = reader["ActualHeadcount"] == DBNull.Value ? null : (int?)reader["ActualHeadcount"],
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString()
+                            };
+                        }
+                    }
                 }
             }
 

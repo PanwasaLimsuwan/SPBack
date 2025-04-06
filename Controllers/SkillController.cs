@@ -19,32 +19,57 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/Skill
+        // ✅ GET: api/Skill (With EmployeeInfo join)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var skills = new List<Skill>();
+            var skills = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM Skill", conn);
+                var query = @"
+                    SELECT 
+                        s.EmpID,
+                        s.FirstName,
+                        s.LastName,
+                        s.SkillGroup,
+                        s.Material,
+                        s.Operation,
+                        s.MachineSAB1,
+                        s.MachineSAB2,
+                        s.MachineSAB3,
+                        s.Inspection,
+                        e.Division,
+                        e.Department,
+                        e.Section,
+                        e.Biz,
+                        e.Process
+                    FROM Skill s
+                    LEFT JOIN EmployeeInfo e ON s.EmpID = e.EmpID";
+
+                var cmd = new SqlCommand(query, conn);
                 var reader = await cmd.ExecuteReaderAsync();
 
                 while (await reader.ReadAsync())
                 {
-                    skills.Add(new Skill
+                    skills.Add(new
                     {
-                        EmpID = reader.GetInt32(0),
-                        FirstName = reader.GetString(1),
-                        LastName = reader.GetString(2),
-                        SkillGroup = reader.GetString(3),
-                        Material = reader.GetInt32(4),
-                        Operation = reader.GetInt32(5),
-                        MachineSAB1 = reader.GetInt32(6),
-                        MachineSAB2 = reader.GetInt32(7),
-                        MachineSAB3 = reader.GetInt32(8),
-                        Inspection = reader.GetInt32(9)
+                        empID = reader["EmpID"],
+                        firstName = reader["FirstName"]?.ToString(),
+                        lastName = reader["LastName"]?.ToString(),
+                        skillGroup = reader["SkillGroup"]?.ToString(),
+                        material = (int)reader["Material"],
+                        operation = (int)reader["Operation"],
+                        machineSAB1 = (int)reader["MachineSAB1"],
+                        machineSAB2 = (int)reader["MachineSAB2"],
+                        machineSAB3 = (int)reader["MachineSAB3"],
+                        inspection = (int)reader["Inspection"],
+                        division = reader["Division"]?.ToString(),
+                        department = reader["Department"]?.ToString(),
+                        section = reader["Section"]?.ToString(),
+                        biz = reader["Biz"]?.ToString(),
+                        process = reader["Process"]?.ToString()
                     });
                 }
             }
@@ -52,33 +77,60 @@ namespace Api.Controllers
             return Ok(skills);
         }
 
-        // GET: api/Skill/{id}
+        // ✅ GET: api/Skill/{id} (With EmployeeInfo join)
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            Skill skill = null;
+            object skill = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM Skill WHERE EmpID = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
+                var query = @"
+                    SELECT 
+                        s.EmpID,
+                        s.FirstName,
+                        s.LastName,
+                        s.SkillGroup,
+                        s.Material,
+                        s.Operation,
+                        s.MachineSAB1,
+                        s.MachineSAB2,
+                        s.MachineSAB3,
+                        s.Inspection,
+                        e.Division,
+                        e.Department,
+                        e.Section,
+                        e.Biz,
+                        e.Process
+                    FROM Skill s
+                    LEFT JOIN EmployeeInfo e ON s.EmpID = e.EmpID
+                    WHERE s.EmpID = @EmpID";
+
+                var cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@EmpID", id);
 
                 var reader = await cmd.ExecuteReaderAsync();
+
                 if (await reader.ReadAsync())
                 {
-                    skill = new Skill
+                    skill = new
                     {
-                        EmpID = reader.GetInt32(0),
-                        FirstName = reader.GetString(1),
-                        LastName = reader.GetString(2),
-                        SkillGroup = reader.GetString(3),
-                        Material = reader.GetInt32(4),
-                        Operation = reader.GetInt32(5),
-                        MachineSAB1 = reader.GetInt32(6),
-                        MachineSAB2 = reader.GetInt32(7),
-                        MachineSAB3 = reader.GetInt32(8),
-                        Inspection = reader.GetInt32(9)
+                        empID = reader["EmpID"],
+                        firstName = reader["FirstName"]?.ToString(),
+                        lastName = reader["LastName"]?.ToString(),
+                        skillGroup = reader["SkillGroup"]?.ToString(),
+                        material = (int)reader["Material"],
+                        operation = (int)reader["Operation"],
+                        machineSAB1 = (int)reader["MachineSAB1"],
+                        machineSAB2 = (int)reader["MachineSAB2"],
+                        machineSAB3 = (int)reader["MachineSAB3"],
+                        inspection = (int)reader["Inspection"],
+                        division = reader["Division"]?.ToString(),
+                        department = reader["Department"]?.ToString(),
+                        section = reader["Section"]?.ToString(),
+                        biz = reader["Biz"]?.ToString(),
+                        process = reader["Process"]?.ToString()
                     };
                 }
             }

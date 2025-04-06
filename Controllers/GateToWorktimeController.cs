@@ -1,86 +1,133 @@
-// using Microsoft.AspNetCore.Mvc;
-// using Microsoft.Extensions.Configuration;
-// using System;
-// using System.Collections.Generic;
-// using System.Data.SqlClient;
-// using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Threading.Tasks;
 
-// namespace Api.Controllers
-// {
-//     [ApiController]
-//     [Route("api/[controller]")]
-//     public class GateToWorktimeController : ControllerBase
-//     {
-//         private readonly string _connectionString;
+namespace Api.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class GateToWorktimeController : ControllerBase
+    {
+        private readonly string _connectionString;
 
-//         public GateToWorktimeController(IConfiguration configuration)
-//         {
-//             _connectionString = configuration.GetConnectionString("DefaultConnection");
-//         }
+        public GateToWorktimeController(IConfiguration configuration)
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
 
-//         [HttpPost]
-//         public async Task<IActionResult> ConvertGateToWorktime()
-//         {
-//             using (var conn = new SqlConnection(_connectionString))
-//             {
-//                 await conn.OpenAsync();
+        [HttpPost]
+        public async Task<IActionResult> ConvertGateToWorktime()
+        {
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
 
-//                 // ดึงข้อมูลจาก GateEntry ที่มี Entry/Exit
-//                 var selectCmd = new SqlCommand(@"
-//                     SELECT EmpID, EntryDateTime, ExitDateTime
-//                     FROM GateEntry
-//                     WHERE EntryDateTime IS NOT NULL AND ExitDateTime IS NOT NULL", conn);
+                    var selectCmd = new SqlCommand(@"
+                        SELECT EmpID, EntryDateTime, ExitDateTime
+                        FROM GateEntry
+                        WHERE EntryDateTime IS NOT NULL", conn);
 
-//                 var reader = await selectCmd.ExecuteReaderAsync();
+                    var reader = await selectCmd.ExecuteReaderAsync();
 
-//                 var worktimeData = new List<(string EmpID, DateTime Date, double WorkedHours)>();
+                    var worktimeData = new List<(string EmpID, DateTime Date, double WorkedHours, double OTHours, string Status)>();
 
-//                 while (await reader.ReadAsync())
-//                 {
-//                     var empId = reader["EmpID"].ToString();
-//                     var entry = (DateTime)reader["EntryDateTime"];
-//                     var exit = (DateTime)reader["ExitDateTime"];
-//                     var hours = (exit - entry).TotalHours;
+                    while (await reader.ReadAsync())
+                    {
+                        var empId = reader["EmpID"].ToString();
+                        var entry = (DateTime)reader["EntryDateTime"];
 
-//                     worktimeData.Add((empId, entry.Date, hours));
-//                 }
+                        var exitValue = reader["ExitDateTime"];
+                        DateTime? exit = exitValue == DBNull.Value ? (DateTime?)null : (DateTime)exitValue;
 
-//                 await reader.CloseAsync();
+                        var workedHours = exit.HasValue ? (exit.Value - entry).TotalHours : 0;
 
-//                 int inserted = 0;
+                        // ✅ คำนวณ OT : ถ้า worked hours > 8 ชั่วโมง
+                        var otHours = workedHours > 8 ? workedHours - 8 : 0;
 
-//                 // เปลี่ยนเฉพาะบรรทัดใน foreach เท่านั้น
-// foreach (var item in worktimeData)
-// {
-//     // เช็คก่อนว่ามีข้อมูลอยู่แล้วไหม
-//     var checkCmd = new SqlCommand(@"
-//         SELECT COUNT(*) FROM CalculatedWorktime
-//         WHERE EmpID = @EmpID AND Date = @Date", conn);
+                        var status = exit == null ? "Active" : "Finished";
 
-//     checkCmd.Parameters.AddWithValue("@EmpID", item.EmpID);
-//     checkCmd.Parameters.AddWithValue("@Date", item.Date);
+                        worktimeData.Add((empId, entry.Date, workedHours, otHours, status));
+                    }
 
-//     var count = (int)await checkCmd.ExecuteScalarAsync();
+                    await reader.CloseAsync();
 
-//     if (count == 0) // ถ้ายังไม่มี ให้ Insert ได้
-//     {
-//         var insertCmd = new SqlCommand(@"
-//             INSERT INTO CalculatedWorktime (EmpID, Date, WorkedHours, Status)
-//             VALUES (@EmpID, @Date, @WorkedHours, @Status)", conn);
+                    int inserted = 0;
+                    int updated = 0;
 
-//         insertCmd.Parameters.AddWithValue("@EmpID", item.EmpID);
-//         insertCmd.Parameters.AddWithValue("@Date", item.Date);
-//         insertCmd.Parameters.AddWithValue("@WorkedHours", item.WorkedHours);
-//         insertCmd.Parameters.AddWithValue("@Status", "auto");
+                    // ✅ ดึงรายการ CalculatedWorktime ที่มีอยู่แล้ว
+                    var existingRecords = new Dictionary<string, (double WorkedHours, double OTHours, string Status)>();
+                    var existingCmd = new SqlCommand("SELECT EmpID, Date, WorkedHours, OTHours, Status FROM CalculatedWorktime", conn);
+                    using (var existingReader = await existingCmd.ExecuteReaderAsync())
+                    {
+                        while (await existingReader.ReadAsync())
+                        {
+                            var empId = existingReader["EmpID"].ToString();
+                            var date = Convert.ToDateTime(existingReader["Date"]).Date;
+                            var workedHours = Convert.ToDouble(existingReader["WorkedHours"]);
+                            var otHours = Convert.ToDouble(existingReader["OTHours"]);
+                            var status = existingReader["Status"].ToString();
 
-//         await insertCmd.ExecuteNonQueryAsync();
-//     }
-// }
+                            existingRecords[$"{empId}_{date:yyyyMMdd}"] = (workedHours, otHours, status);
+                        }
+                    }
 
+                    // ✅ Insert / Update
+                    foreach (var item in worktimeData)
+                    {
+                        var key = $"{item.EmpID}_{item.Date:yyyyMMdd}";
 
+                        if (!existingRecords.ContainsKey(key))
+                        {
+                            var insertCmd = new SqlCommand(@"
+                                INSERT INTO CalculatedWorktime (EmpID, Date, WorkedHours, OTHours, Status)
+                                VALUES (@EmpID, @Date, @WorkedHours, @OTHours, @Status)", conn);
 
-//                 return Ok($"Worktime inserted: {inserted} records.");
-//             }
-//         }
-//     }
-// }
+                            insertCmd.Parameters.AddWithValue("@EmpID", item.EmpID);
+                            insertCmd.Parameters.AddWithValue("@Date", item.Date);
+                            insertCmd.Parameters.AddWithValue("@WorkedHours", item.WorkedHours);
+                            insertCmd.Parameters.AddWithValue("@OTHours", item.OTHours);
+                            insertCmd.Parameters.AddWithValue("@Status", item.Status);
+
+                            await insertCmd.ExecuteNonQueryAsync();
+                            inserted++;
+                        }
+                        else
+                        {
+                            var existing = existingRecords[key];
+
+                            if (existing.Status != item.Status || 
+                                Math.Abs(existing.WorkedHours - item.WorkedHours) > 0.01 ||
+                                Math.Abs(existing.OTHours - item.OTHours) > 0.01)
+                            {
+                                var updateCmd = new SqlCommand(@"
+                                    UPDATE CalculatedWorktime
+                                    SET WorkedHours = @WorkedHours, OTHours = @OTHours, Status = @Status
+                                    WHERE EmpID = @EmpID AND Date = @Date", conn);
+
+                                updateCmd.Parameters.AddWithValue("@EmpID", item.EmpID);
+                                updateCmd.Parameters.AddWithValue("@Date", item.Date);
+                                updateCmd.Parameters.AddWithValue("@WorkedHours", item.WorkedHours);
+                                updateCmd.Parameters.AddWithValue("@OTHours", item.OTHours);
+                                updateCmd.Parameters.AddWithValue("@Status", item.Status);
+
+                                await updateCmd.ExecuteNonQueryAsync();
+                                updated++;
+                            }
+                        }
+                    }
+
+                    return Ok($"Worktime inserted: {inserted} records, updated: {updated} records.");
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+    }
+}

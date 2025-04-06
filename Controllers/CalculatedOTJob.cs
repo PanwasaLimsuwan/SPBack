@@ -1,111 +1,117 @@
-// using System;
-// using System.Data.SqlClient;
-// using System.Threading;
-// using System.Threading.Tasks;
-// using Microsoft.Extensions.Hosting;
-// using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 
-// public class CalculatedOTJob : BackgroundService
-// {
-//     private readonly IConfiguration _configuration;
+namespace Api.Jobs
+{
+    public class CalculatedOTJob : BackgroundService
+    {
+        private readonly IConfiguration _configuration;
 
-//     public CalculatedOTJob(IConfiguration configuration)
-//     {
-//         _configuration = configuration;
-//     }
+        public CalculatedOTJob(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
-//     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-//     {
-//         while (!stoppingToken.IsCancellationRequested)
-//         {
-//             try
-//             {
-//                 string connStr = _configuration.GetConnectionString("DefaultConnection");
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    string connStr = _configuration.GetConnectionString("DefaultConnection");
 
-//                 using (var conn = new SqlConnection(connStr))
-//                 {
-//                     await conn.OpenAsync();
+                    using (var conn = new SqlConnection(connStr))
+                    {
+                        await conn.OpenAsync();
 
-//                     var cmd = new SqlCommand(@"
-//                         SELECT EmpID, 
-//                                YEAR(Date) AS Year,
-//                                MONTH(Date) AS Month,
-//                                SUM(WorkedHours) AS TotalHours,
-//                                SUM(CASE WHEN WorkedHours > 8 THEN WorkedHours - 8 ELSE 0 END) AS OT_Total
-//                         FROM CalculatedWorktime
-//                         GROUP BY EmpID, YEAR(Date), MONTH(Date)", conn);
+                        var cmd = new SqlCommand(@"
+                            SELECT 
+                                EmpID,
+                                DATEPART(YEAR, Date) AS Year,
+                                DATEPART(WEEK, Date) AS WeekID,
+                                SUM(WorkedHours) AS TotalHours,
+                                SUM(OTHours) AS TotalOT,
+                                COUNT(DISTINCT CAST(Date AS DATE)) AS DaysWorked
+                            FROM CalculatedWorktime
+                            GROUP BY EmpID, DATEPART(YEAR, Date), DATEPART(WEEK, Date)", conn);
 
-//                     var reader = await cmd.ExecuteReaderAsync();
+                        var reader = await cmd.ExecuteReaderAsync();
 
-//                     var summaryList = new List<(string EmpID, int Year, int Month, int OT_Total, float TotalHours)>();
+                        var summaryList = new List<(string EmpID, int Year, int WeekID, double TotalHours, double TotalOT, int DaysWorked)>();
 
-//                     while (await reader.ReadAsync())
-//                     {
-//                         var empID = reader["EmpID"].ToString();
-//                         var year = (int)reader["Year"];
-//                         var month = (int)reader["Month"];
-//                         var totalHours = Convert.ToSingle(reader["TotalHours"]);
-//                         var ot = Convert.ToInt32(reader["OT_Total"]);
+                        while (await reader.ReadAsync())
+                        {
+                            summaryList.Add((
+                                reader["EmpID"].ToString(),
+                                Convert.ToInt32(reader["Year"]),
+                                Convert.ToInt32(reader["WeekID"]),
+                                Convert.ToDouble(reader["TotalHours"]),
+                                Convert.ToDouble(reader["TotalOT"]),
+                                Convert.ToInt32(reader["DaysWorked"])
+                            ));
+                        }
 
-//                         summaryList.Add((empID, year, month, ot, totalHours));
-//                     }
+                        await reader.CloseAsync();
 
-//                     await reader.CloseAsync();
+                        foreach (var summary in summaryList)
+                        {
+                            var checkCmd = new SqlCommand(@"
+                                SELECT COUNT(*) FROM EICC_Control
+                                WHERE EmpID = @EmpID AND WeekID = @WeekID", conn);
 
-//                     foreach (var s in summaryList)
-//                     {
-//                         var checkCmd = new SqlCommand(@"
-//                             SELECT COUNT(*) FROM EICC_MonthlySummary
-//                             WHERE EmpID = @EmpID AND Year = @Year AND Month = @Month", conn);
+                            checkCmd.Parameters.AddWithValue("@EmpID", summary.EmpID);
+                            checkCmd.Parameters.AddWithValue("@WeekID", summary.WeekID);
 
-//                         checkCmd.Parameters.AddWithValue("@EmpID", s.EmpID);
-//                         checkCmd.Parameters.AddWithValue("@Year", s.Year);
-//                         checkCmd.Parameters.AddWithValue("@Month", s.Month);
+                            var count = (int)await checkCmd.ExecuteScalarAsync();
 
-//                         var count = (int)await checkCmd.ExecuteScalarAsync();
+                            if (count > 0)
+                            {
+                                var updateCmd = new SqlCommand(@"
+                                    UPDATE EICC_Control
+                                    SET TotalHours = @TotalHours, DaysWorked = @DaysWorked, TotalOT = @TotalOT, Status = @Status
+                                    WHERE EmpID = @EmpID AND WeekID = @WeekID", conn);
 
-//                         if (count > 0)
-//                         {
-//                             var updateCmd = new SqlCommand(@"
-//                                 UPDATE EICC_MonthlySummary SET
-//                                     OT_Total = @OT_Total,
-//                                     TotalHours = @TotalHours,
-//                                     EICC_Hours = @TotalHours
-//                                 WHERE EmpID = @EmpID AND Year = @Year AND Month = @Month", conn);
+                                updateCmd.Parameters.AddWithValue("@EmpID", summary.EmpID);
+                                updateCmd.Parameters.AddWithValue("@WeekID", summary.WeekID);
+                                updateCmd.Parameters.AddWithValue("@TotalHours", summary.TotalHours);
+                                updateCmd.Parameters.AddWithValue("@DaysWorked", summary.DaysWorked);
+                                updateCmd.Parameters.AddWithValue("@TotalOT", summary.TotalOT);
+                                updateCmd.Parameters.AddWithValue("@Status", "Active");
 
-//                             updateCmd.Parameters.AddWithValue("@EmpID", s.EmpID);
-//                             updateCmd.Parameters.AddWithValue("@Year", s.Year);
-//                             updateCmd.Parameters.AddWithValue("@Month", s.Month);
-//                             updateCmd.Parameters.AddWithValue("@OT_Total", s.OT_Total);
-//                             updateCmd.Parameters.AddWithValue("@TotalHours", s.TotalHours);
+                                await updateCmd.ExecuteNonQueryAsync();
+                            }
+                            else
+                            {
+                                var insertCmd = new SqlCommand(@"
+                                    INSERT INTO EICC_Control (EmpID, WeekID, TotalHours, DaysWorked, TotalOT, Status)
+                                    VALUES (@EmpID, @WeekID, @TotalHours, @DaysWorked, @TotalOT, @Status)", conn);
 
-//                             await updateCmd.ExecuteNonQueryAsync();
-//                         }
-//                         else
-//                         {
-//                             var insertCmd = new SqlCommand(@"
-//                                 INSERT INTO EICC_MonthlySummary (EmpID, Year, Month, OT_Total, EICC_Hours, TotalHours)
-//                                 VALUES (@EmpID, @Year, @Month, @OT_Total, @TotalHours, @TotalHours)", conn);
+                                insertCmd.Parameters.AddWithValue("@EmpID", summary.EmpID);
+                                insertCmd.Parameters.AddWithValue("@WeekID", summary.WeekID);
+                                insertCmd.Parameters.AddWithValue("@TotalHours", summary.TotalHours);
+                                insertCmd.Parameters.AddWithValue("@DaysWorked", summary.DaysWorked);
+                                insertCmd.Parameters.AddWithValue("@TotalOT", summary.TotalOT);
+                                insertCmd.Parameters.AddWithValue("@Status", "Active");
 
-//                             insertCmd.Parameters.AddWithValue("@EmpID", s.EmpID);
-//                             insertCmd.Parameters.AddWithValue("@Year", s.Year);
-//                             insertCmd.Parameters.AddWithValue("@Month", s.Month);
-//                             insertCmd.Parameters.AddWithValue("@OT_Total", s.OT_Total);
-//                             insertCmd.Parameters.AddWithValue("@TotalHours", s.TotalHours);
+                                await insertCmd.ExecuteNonQueryAsync();
+                            }
+                        }
+                    }
 
-//                             await insertCmd.ExecuteNonQueryAsync();
-//                         }
-//                     }
-//                 }
+                    Console.WriteLine($"[CalculatedOTJob] Updated at {DateTime.Now}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[CalculatedOTJob] ERROR: {ex.Message}");
+                }
 
-//                 Console.WriteLine($"[CalculatedOTJob] Updated at {DateTime.Now}");
-//             }
-//             catch (Exception ex)
-//             {
-//                 Console.WriteLine($"[CalculatedOTJob] ERROR: {ex.Message}");
-//             }
-
-//             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
-//         }
-//     }
-// }
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+    }
+}

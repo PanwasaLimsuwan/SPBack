@@ -21,69 +21,90 @@ namespace Api.Controllers
 
         // GET: api/GateEntry
         // ดึงข้อมูลจากทั้ง GateEntry, EmployeeInfo, OJTandInspectionSkill, CleanroomEntry โดยใช้ ADO.NET
-        [HttpGet]
-        public async Task<IActionResult> GetGateEntry()
+        // GET: api/GateEntry
+[HttpGet]
+public async Task<IActionResult> GetGateEntry(
+    [FromQuery] string? division,
+    [FromQuery] string? department,
+    [FromQuery] string? section,
+    [FromQuery] string? biz,
+    [FromQuery] string? process)
+{
+    var result = new List<object>();
+
+    using (var conn = new SqlConnection(_connectionString))
+    {
+        await conn.OpenAsync();
+
+        var query = @"
+            SELECT 
+                g.EmpID, e.FirstName, e.LastName, e.Division, e.Department, 
+                e.Position, e.Email, e.ShiftCode, e.Section,
+                g.EntryDateTime, g.ExitDateTime, g.GateNo, g.GateStatus,
+                o.Biz, o.Process, o.CourseGroup, o.SkillGroup,
+                c.CStatus, c.CheckInDateTime, c.CheckOutDateTime
+            FROM GateEntry g
+            JOIN EmployeeInfo e ON g.EmpID = e.EmpID
+            LEFT JOIN OJTandInspectionSkill o ON g.EmpID = o.EmpID
+            LEFT JOIN CleanroomEntry c ON g.EmpID = c.EmpID
+            WHERE (@division IS NULL OR e.Division = @division)
+              AND (@department IS NULL OR e.Department = @department)
+              AND (@section IS NULL OR e.Section = @section)
+              AND (@biz IS NULL OR o.Biz = @biz)
+              AND (@process IS NULL OR o.Process = @process)";
+
+        using (var cmd = new SqlCommand(query, conn))
         {
-            var result = new List<object>();
+            cmd.Parameters.AddWithValue("@division", string.IsNullOrEmpty(division) || division == "ALL" ? DBNull.Value : division);
+            cmd.Parameters.AddWithValue("@department", string.IsNullOrEmpty(department) || department == "ALL" ? DBNull.Value : department);
+            cmd.Parameters.AddWithValue("@section", string.IsNullOrEmpty(section) || section == "ALL" ? DBNull.Value : section);
+            cmd.Parameters.AddWithValue("@biz", string.IsNullOrEmpty(biz) || biz == "ALL" ? DBNull.Value : biz);
+            cmd.Parameters.AddWithValue("@process", string.IsNullOrEmpty(process) || process == "ALL" ? DBNull.Value : process);
 
-            using (var conn = new SqlConnection(_connectionString))
+            using (var reader = await cmd.ExecuteReaderAsync())
             {
-                await conn.OpenAsync();
-                var query = @"
-                    SELECT 
-                        g.EmpID, e.FirstName, e.LastName, e.Division, e.Department, 
-                        e.Position, e.Email, e.ShiftCode, e.Section,
-                        g.EntryDateTime, g.ExitDateTime, g.GateNo, g.GateStatus,
-                        o.Biz, o.Process, o.CourseGroup, o.SkillGroup,
-                        c.CStatus, c.CheckInDateTime, c.CheckOutDateTime
-                    FROM GateEntry g
-                    JOIN EmployeeInfo e ON g.EmpID = e.EmpID
-                    JOIN OJTandInspectionSkill o ON g.EmpID = o.EmpID
-                    JOIN CleanroomEntry c ON g.EmpID = c.EmpID";
-
-                using (var cmd = new SqlCommand(query, conn))
-                using (var reader = await cmd.ExecuteReaderAsync())
+                while (await reader.ReadAsync())
                 {
-                    while (await reader.ReadAsync())
+                    var gateStatus = reader["GateStatus"]?.ToString();
+                    var cStatus = reader["CStatus"]?.ToString();
+
+                    string status = (cStatus == "OUT" && gateStatus == "OUT") ? "status-missing"
+                                 : (cStatus == "OUT" && gateStatus == "IN") ? "status-out-cleanroom"
+                                 : (cStatus == "IN" && gateStatus == "IN") ? "status-in-cleanroom"
+                                 : "status-unknown";
+
+                    result.Add(new
                     {
-                        var gateStatus = reader["GateStatus"]?.ToString();
-                        var cStatus = reader["CStatus"]?.ToString();
-
-                        string status = (cStatus == "OUT" && gateStatus == "OUT") ? "status-missing"
-                                     : (cStatus == "OUT" && gateStatus == "IN") ? "status-out-cleanroom"
-                                     : (cStatus == "IN" && gateStatus == "IN") ? "status-in-cleanroom"
-                                     : "status-unknown";
-
-                        result.Add(new
-                        {
-                            empID = reader["EmpID"]?.ToString(),
-                            firstName = reader["FirstName"]?.ToString(),
-                            lastName = reader["LastName"]?.ToString(),
-                            division = reader["Division"]?.ToString(),
-                            department = reader["Department"]?.ToString(),
-                            position = reader["Position"]?.ToString(),
-                            email = reader["Email"]?.ToString(),
-                            shiftCode = reader["ShiftCode"]?.ToString(),
-                            section = reader["Section"]?.ToString(),
-                            entryDateTime = reader["EntryDateTime"] == DBNull.Value ? null : ((DateTime)reader["EntryDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
-                            exitDateTime = reader["ExitDateTime"] == DBNull.Value ? null : ((DateTime)reader["ExitDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
-                            gateNo = reader["GateNo"]?.ToString(),
-                            gateStatus = gateStatus,
-                            biz = reader["Biz"]?.ToString(),
-                            process = reader["Process"]?.ToString(),
-                            courseGroup = reader["CourseGroup"]?.ToString(),
-                            workGroup = reader["SkillGroup"]?.ToString(),
-                            cStatus = cStatus,
-                            checkInDateTime = reader["CheckInDateTime"] == DBNull.Value ? null : ((DateTime)reader["CheckInDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
-                            checkOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? null : ((DateTime)reader["CheckOutDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
-                            status = status
-                        });
-                    }
+                        empID = reader["EmpID"]?.ToString(),
+                        firstName = reader["FirstName"]?.ToString(),
+                        lastName = reader["LastName"]?.ToString(),
+                        division = reader["Division"]?.ToString(),
+                        department = reader["Department"]?.ToString(),
+                        position = reader["Position"]?.ToString(),
+                        email = reader["Email"]?.ToString(),
+                        shiftCode = reader["ShiftCode"]?.ToString(),
+                        section = reader["Section"]?.ToString(),
+                        entryDateTime = reader["EntryDateTime"] == DBNull.Value ? null : ((DateTime)reader["EntryDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
+                        exitDateTime = reader["ExitDateTime"] == DBNull.Value ? null : ((DateTime)reader["ExitDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
+                        gateNo = reader["GateNo"]?.ToString(),
+                        gateStatus = gateStatus,
+                        biz = reader["Biz"]?.ToString(),
+                        process = reader["Process"]?.ToString(),
+                        courseGroup = reader["CourseGroup"]?.ToString(),
+                        workGroup = reader["SkillGroup"]?.ToString(),
+                        cStatus = cStatus,
+                        checkInDateTime = reader["CheckInDateTime"] == DBNull.Value ? null : ((DateTime)reader["CheckInDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
+                        checkOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? null : ((DateTime)reader["CheckOutDateTime"]).ToString("yyyy-MM-dd HH:mm:ss"),
+                        status = status
+                    });
                 }
             }
-
-            return Ok(result);
         }
+    }
+
+    return Ok(result);
+}
+
 
         // GET: api/GateEntry/{id}
         [HttpGet("{id}")]

@@ -19,7 +19,7 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/EmployeeInfo
+        // ✅ GET: api/EmployeeInfo
         [HttpGet]
         public async Task<IActionResult> GetAllEmployees()
         {
@@ -51,7 +51,9 @@ namespace Api.Controllers
                             CostCenter = reader["CostCenter"]?.ToString(),
                             ShiftCode = reader["ShiftCode"]?.ToString(),
                             Position = reader["Position"]?.ToString(),
-                            Email = reader["Email"]?.ToString()
+                            Email = reader["Email"]?.ToString(),
+                            Biz = reader["Biz"]?.ToString(),               // ✅ เพิ่ม Biz
+                            Process = reader["Process"]?.ToString()       // ✅ เพิ่ม Process
                         });
                     }
                 }
@@ -60,7 +62,7 @@ namespace Api.Controllers
             return Ok(employees);
         }
 
-        // GET: api/EmployeeInfo/1001
+        // ✅ GET: api/EmployeeInfo/1001
         [HttpGet("{id}")]
         public async Task<IActionResult> GetEmployeeById(int id)
         {
@@ -95,7 +97,9 @@ namespace Api.Controllers
                                 CostCenter = reader["CostCenter"]?.ToString(),
                                 ShiftCode = reader["ShiftCode"]?.ToString(),
                                 Position = reader["Position"]?.ToString(),
-                                Email = reader["Email"]?.ToString()
+                                Email = reader["Email"]?.ToString(),
+                                Biz = reader["Biz"]?.ToString(),           // ✅ เพิ่ม Biz
+                                Process = reader["Process"]?.ToString()   // ✅ เพิ่ม Process
                             };
                         }
                     }
@@ -106,7 +110,7 @@ namespace Api.Controllers
             return Ok(employee);
         }
 
-        // POST: api/EmployeeInfo
+        // ✅ POST: api/EmployeeInfo
         [HttpPost]
         public async Task<IActionResult> CreateEmployee([FromBody] EmployeeInfo emp)
         {
@@ -116,9 +120,9 @@ namespace Api.Controllers
 
                 string query = @"
                     INSERT INTO EmployeeInfo 
-                    (EmpID, GID, FirstName, LastName, Division, Department, Section, JobGrade, BossID, BossGID, CostCenter, ShiftCode, Position, Email) 
+                    (EmpID, GID, FirstName, LastName, Division, Department, Section, JobGrade, BossID, BossGID, CostCenter, ShiftCode, Position, Email, Biz, Process) 
                     VALUES 
-                    (@EmpID, @GID, @FirstName, @LastName, @Division, @Department, @Section, @JobGrade, @BossID, @BossGID, @CostCenter, @ShiftCode, @Position, @Email)";
+                    (@EmpID, @GID, @FirstName, @LastName, @Division, @Department, @Section, @JobGrade, @BossID, @BossGID, @CostCenter, @ShiftCode, @Position, @Email, @Biz, @Process)";
 
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
@@ -136,6 +140,8 @@ namespace Api.Controllers
                     cmd.Parameters.AddWithValue("@ShiftCode", emp.ShiftCode ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@Position", emp.Position ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@Email", emp.Email ?? "");
+                    cmd.Parameters.AddWithValue("@Biz", emp.Biz ?? (object)DBNull.Value);              // ✅ เพิ่ม Biz
+                    cmd.Parameters.AddWithValue("@Process", emp.Process ?? (object)DBNull.Value);      // ✅ เพิ่ม Process
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -144,7 +150,7 @@ namespace Api.Controllers
             return Ok("Employee created successfully");
         }
 
-        // PUT: api/EmployeeInfo/1001
+        // ✅ PUT: api/EmployeeInfo/1001
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateEmployee(int id, [FromBody] EmployeeInfo emp)
         {
@@ -168,7 +174,9 @@ namespace Api.Controllers
                         CostCenter = @CostCenter,
                         ShiftCode = @ShiftCode,
                         Position = @Position,
-                        Email = @Email
+                        Email = @Email,
+                        Biz = @Biz,
+                        Process = @Process
                     WHERE EmpID = @EmpID";
 
                 using (SqlCommand cmd = new SqlCommand(query, conn))
@@ -187,6 +195,8 @@ namespace Api.Controllers
                     cmd.Parameters.AddWithValue("@ShiftCode", emp.ShiftCode ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@Position", emp.Position ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@Email", emp.Email ?? "");
+                    cmd.Parameters.AddWithValue("@Biz", emp.Biz ?? (object)DBNull.Value);              // ✅ เพิ่ม Biz
+                    cmd.Parameters.AddWithValue("@Process", emp.Process ?? (object)DBNull.Value);      // ✅ เพิ่ม Process
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -195,7 +205,7 @@ namespace Api.Controllers
             return Ok("Employee updated successfully");
         }
 
-        // DELETE: api/EmployeeInfo/1001
+        // ✅ DELETE: api/EmployeeInfo/1001
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEmployee(int id)
         {

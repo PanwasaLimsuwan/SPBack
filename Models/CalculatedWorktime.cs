@@ -1,4 +1,3 @@
-// Models/CalculatedWorktime.cs
 using System;
 using System.ComponentModel.DataAnnotations;
 
@@ -11,6 +10,7 @@ namespace Api.Models
         public string EmpID { get; set; }
         public DateTime Date { get; set; }
         public double WorkedHours { get; set; }
+        public double OTHours { get; set; } // ✅ เพิ่มตรงนี้!
         public string Status { get; set; }
     }
 }

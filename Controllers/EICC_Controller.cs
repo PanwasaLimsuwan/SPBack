@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
 using Api.Models;
@@ -22,61 +22,44 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var results = new List<EICC_Control>();
+            var results = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM EICC_Control", conn);
-                var reader = await cmd.ExecuteReaderAsync();
 
-                while (await reader.ReadAsync())
+                var query = @"
+                    SELECT 
+                        eicc.ControlID, eicc.EmpID, eicc.WeekID, eicc.TotalHours, eicc.DaysWorked, eicc.TotalOT, eicc.Status,
+                        ei.Division, ei.Department, ei.Section, ei.Biz, ei.Process
+                    FROM EICC_Control eicc
+                    JOIN EmployeeInfo ei ON eicc.EmpID = CAST(ei.EmpID AS VARCHAR)";
+
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = await cmd.ExecuteReaderAsync())
                 {
-                    results.Add(new EICC_Control
+                    while (await reader.ReadAsync())
                     {
-                        ControlID = reader.GetInt32(0),
-                        EmpID = reader.GetString(1),
-                        WeekID = reader.GetInt32(2),
-                        TotalHours = reader.IsDBNull(3) ? null : reader.GetFloat(3),
-                        DaysWorked = reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                        Status = reader.GetString(5)
-                    });
+                        results.Add(new
+                        {
+                            controlID = reader.GetInt32(0),
+                            empID = reader["EmpID"].ToString(),
+                            weekID = reader.GetInt32(2),
+                            totalHours = reader.IsDBNull(3) ? null : (float?)reader.GetFloat(3),
+                            daysWorked = reader.IsDBNull(4) ? null : (int?)reader.GetInt32(4),
+                            totalOT = reader.IsDBNull(5) ? null : (float?)reader.GetDouble(5),
+                            status = reader["Status"]?.ToString(),
+                            division = reader["Division"]?.ToString(),
+                            department = reader["Department"]?.ToString(),
+                            section = reader["Section"]?.ToString(),
+                            biz = reader["Biz"]?.ToString(),
+                            process = reader["Process"]?.ToString()
+                        });
+                    }
                 }
             }
 
             return Ok(results);
-        }
-
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            EICC_Control result = null;
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM EICC_Control WHERE ControlID = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
-
-                var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
-                {
-                    result = new EICC_Control
-                    {
-                        ControlID = reader.GetInt32(0),
-                        EmpID = reader.GetString(1),
-                        WeekID = reader.GetInt32(2),
-                        TotalHours = reader.IsDBNull(3) ? null : reader.GetFloat(3),
-                        DaysWorked = reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                        Status = reader.GetString(5)
-                    };
-                }
-            }
-
-            if (result == null)
-                return NotFound();
-
-            return Ok(result);
         }
 
         [HttpPost]
@@ -85,14 +68,16 @@ namespace Api.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
+
                 var cmd = new SqlCommand(@"
-                    INSERT INTO EICC_Control (EmpID, WeekID, TotalHours, DaysWorked, Status)
-                    VALUES (@EmpID, @WeekID, @TotalHours, @DaysWorked, @Status)", conn);
+                    INSERT INTO EICC_Control (EmpID, WeekID, TotalHours, DaysWorked, TotalOT, Status)
+                    VALUES (@EmpID, @WeekID, @TotalHours, @DaysWorked, @TotalOT, @Status)", conn);
 
                 cmd.Parameters.AddWithValue("@EmpID", control.EmpID);
                 cmd.Parameters.AddWithValue("@WeekID", control.WeekID);
                 cmd.Parameters.AddWithValue("@TotalHours", (object)control.TotalHours ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@DaysWorked", (object)control.DaysWorked ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@TotalOT", (object)control.TotalOT ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Status", control.Status);
 
                 await cmd.ExecuteNonQueryAsync();
@@ -107,12 +92,14 @@ namespace Api.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
+
                 var cmd = new SqlCommand(@"
                     UPDATE EICC_Control SET
                         EmpID = @EmpID,
                         WeekID = @WeekID,
                         TotalHours = @TotalHours,
                         DaysWorked = @DaysWorked,
+                        TotalOT = @TotalOT,
                         Status = @Status
                     WHERE ControlID = @ControlID", conn);
 
@@ -121,6 +108,7 @@ namespace Api.Controllers
                 cmd.Parameters.AddWithValue("@WeekID", control.WeekID);
                 cmd.Parameters.AddWithValue("@TotalHours", (object)control.TotalHours ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@DaysWorked", (object)control.DaysWorked ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@TotalOT", (object)control.TotalOT ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Status", control.Status);
 
                 int rowsAffected = await cmd.ExecuteNonQueryAsync();
@@ -137,6 +125,7 @@ namespace Api.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
+
                 var cmd = new SqlCommand("DELETE FROM EICC_Control WHERE ControlID = @id", conn);
                 cmd.Parameters.AddWithValue("@id", id);
 

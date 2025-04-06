@@ -1,28 +1,50 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
-  filterStatus: String
+  filterStatus: String,
+  filters: Object
 });
 const emit = defineEmits(['clear-status']);
 
 const employees = ref([]);
+const isLoading = ref(false);
 
+// ✅ Fetch พร้อมใช้ filters
 const fetchEmployees = async () => {
+  isLoading.value = true;
   try {
-    const response = await axios.get('http://localhost:5000/api/GateEntry');
+    const response = await axios.get('http://localhost:5000/api/GateEntry', {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      },
+    });
     employees.value = response.data;
   } catch (error) {
     console.error('Error fetching gate entry data:', error);
+  } finally {
+    isLoading.value = false;
   }
 };
 
+// ✅ watch filters แล้ว refetch และ reset filterStatus
+watch(() => props.filters, () => {
+  fetchEmployees();
+  emit('clear-status');
+}, { deep: true });
+
+// ✅ filter ตาม status ที่กด Pie chart
 const filteredEmployees = computed(() => {
   if (!props.filterStatus) return employees.value;
   return employees.value.filter(e => e.status === props.filterStatus);
 });
 
+// ✅ sorted ให้เรียง status ตามลำดับ
 const sortedEmployees = computed(() => {
   const rank = {
     'status-missing': 0,
@@ -37,10 +59,12 @@ const sortedEmployees = computed(() => {
   });
 });
 
+// ✅ reset filterStatus
 const resetFilter = () => {
   emit('clear-status');
 };
 
+// ✅ class status
 const getStatusClass = (status) => {
   return {
     'status-in-cleanroom': 'status-in-cleanroom',
@@ -49,6 +73,7 @@ const getStatusClass = (status) => {
   }[status] || '';
 };
 
+// ✅ label status
 const getStatusLabel = (status) => {
   return {
     'status-in-cleanroom': 'In Cleanroom',
@@ -61,7 +86,6 @@ onMounted(() => {
   fetchEmployees();
 });
 </script>
-
 
 <template>
   <div class="employee-table">
@@ -87,7 +111,7 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(employee, index) in  sortedEmployees" :key="index">
+          <tr v-for="(employee, index) in sortedEmployees" :key="index">
             <td>{{ employee.empID }}</td>
             <td>{{ employee.firstName }}</td>
             <td>{{ employee.lastName }}</td>

@@ -1,5 +1,7 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
+
 import HeadcountStatus from "../components/HeadcountStatus.vue";
 import RequiredBarChart from "../components/RequiredBarChart.vue";
 import EmployeeRecommendations from "../components/EmployeeRecommendations.vue";
@@ -15,12 +17,53 @@ import EmployeeGateEntry from "../components/EmployeeGateEntry.vue";
 import StatusTab from "@/components/StatusTab.vue";
 
 const employees = ref([]);
-const filteredEmployees = ref([]);
 const selectedStatus = ref(null);
 const selectedSkill = ref(null);
 const selectedEmployee = ref(null);
 const skills = ref([]);
 
+// ✅ Filters
+const filters = ref({
+  division: 'ALL',
+  department: 'ALL',
+  section: 'ALL',
+  biz: 'ALL',
+  process: 'ALL',
+  search: '',
+});
+
+// ✅ Dynamic options
+const divisions = computed(() => [...new Set(employees.value.map(e => e.division).filter(Boolean))]);
+const departments = computed(() => [...new Set(employees.value.map(e => e.department).filter(Boolean))]);
+const sections = computed(() => [...new Set(employees.value.map(e => e.section).filter(Boolean))]);
+const bizs = computed(() => [...new Set(employees.value.map(e => e.biz).filter(Boolean))]);
+const processes = computed(() => [...new Set(employees.value.map(e => e.process).filter(Boolean))]);
+
+// ✅ Fetch Employee Data
+onMounted(async () => {
+  try {
+    const response = await axios.get('http://localhost:5000/api/EmployeeInfo');
+    employees.value = response.data;
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+  }
+});
+
+// ✅ Filter function
+const filteredEmployees = computed(() => {
+  return employees.value.filter(emp => {
+    const matchDivision = filters.value.division === 'ALL' || emp.division === filters.value.division;
+    const matchDepartment = filters.value.department === 'ALL' || emp.department === filters.value.department;
+    const matchSection = filters.value.section === 'ALL' || emp.section === filters.value.section;
+    const matchBiz = filters.value.biz === 'ALL' || emp.biz === filters.value.biz;
+    const matchProcess = filters.value.process === 'ALL' || emp.process === filters.value.process;
+    const matchSearch = filters.value.search === '' || emp.firstName?.toLowerCase().includes(filters.value.search.toLowerCase()) || emp.lastName?.toLowerCase().includes(filters.value.search.toLowerCase());
+
+    return matchDivision && matchDepartment && matchSection && matchBiz && matchProcess && matchSearch;
+  });
+});
+
+// ✅ Event functions
 const filterEmployeesByStatus = (status) => {
   selectedStatus.value = status;
 };
@@ -41,102 +84,108 @@ const selectEmployee = (employee) => {
         <img src="logo2.png" alt="Sony Logo" class="logo" />
       </a>
       <div class="filters">
-        <select>
+        <select v-model="filters.division">
           <option value="ALL">Division : ALL</option>
-          <option value="ISM">ISM</option>
-          <option value="DDM">DDM</option>
-          <option value="LDM">LDM</option>
+          <option v-for="division in divisions" :key="division" :value="division">{{ division }}</option>
         </select>
-        <select>
+        <select v-model="filters.department">
           <option value="ALL">Department : ALL</option>
-          <option value="MF1">MF1</option>
-          <option value="MF2">MF2</option>
+          <option v-for="department in departments" :key="department" :value="department">{{ department }}</option>
         </select>
-        <select>
+        <select v-model="filters.section">
           <option value="ALL">Section : ALL</option>
-          <option value="ASSY Section">ASSY Section</option>
-          <option value="TEST Section">TEST Section</option>
+          <option v-for="section in sections" :key="section" :value="section">{{ section }}</option>
         </select>
-        <select>
+        <select v-model="filters.biz">
           <option value="ALL">Biz : ALL</option>
-          <option value="IS">IS</option>
-          <option value="HTPS">HTPS</option>
-          <option value="MOLED">MOLED</option>
+          <option v-for="biz in bizs" :key="biz" :value="biz">{{ biz }}</option>
         </select>
-        <select>
+        <select v-model="filters.process">
           <option value="ALL">Process : ALL</option>
-          <option value="ASSY">ASSY</option>
-          <option value="MOKU">MOKU</option>
-          <option value="CSAT">CSAT</option>
-          <option value="JUNB">JUNB</option>
+          <option v-for="process in processes" :key="process" :value="process">{{ process }}</option>
         </select>
-        <input type="text" placeholder="Search" />
+        <input type="text" v-model="filters.search" placeholder="Search" />
       </div>
     </header>
 
     <section class="stats">
-      <StatusTab />
+      <StatusTab :filters="filters" />
     </section>
 
     <section class="charts">
       <div class="chart">
-        <HeadcountStatus @filter-status="filterEmployeesByStatus" />
+        <HeadcountStatus :filters="filters" @filter-status="filterEmployeesByStatus" />
       </div>
       <div class="table">
-        <EmployeeGateEntry :filterStatus="selectedStatus" @clear-status="selectedStatus = null" />
+        <EmployeeGateEntry
+          :employees="filteredEmployees"
+          :filterStatus="selectedStatus"
+          :filters="filters"
+          @clear-status="selectedStatus = null"
+        />
       </div>
     </section>
 
     <section class="charts">
       <div class="chart">
-        <RequiredBarChart />
+        <RequiredBarChart :filters="filters" />
       </div>
       <div class="table">
-        <EmployeeRecommendations :employees="filteredEmployees" @selectEmployee="selectEmployee" />
+        <EmployeeRecommendations
+          :employees="filteredEmployees"
+          :filters="filters"
+          @selectEmployee="selectEmployee"
+        />
       </div>
     </section>
 
     <section class="charts">
       <div class="chart">
-        <fullySkilledPieChart @filter-skills="filterEmployeesBySkill" />
+        <fullySkilledPieChart :filters="filters" @filter-skills="filterEmployeesBySkill" />
       </div>
       <div class="skill-section-container">
         <div class="skill-table">
           <EmployeeSkillTable
             :selectedSkillFilter="selectedSkill"
-            @clear-skill="selectedSkill = null"
             :employees="filteredEmployees"
             :selectedEmployee="selectedEmployee"
+            :filters="filters"
+            @clear-skill="selectedSkill = null"
             @selectEmployee="selectEmployee"
           />
         </div>
         <div class="skill-detail" ref="skillSection">
-          <EmployeeSkillSection v-if="selectedEmployee" :employee="selectedEmployee" :skills="skills" />
+          <EmployeeSkillSection
+            v-if="selectedEmployee"
+            :employee="selectedEmployee"
+            :skills="skills"
+            :filters="filters"
+          />
         </div>
       </div>
     </section>
 
     <section class="charts">
       <div class="chart">
-        <WorkedTimeChart />
+        <WorkedTimeChart :filters="filters" />
       </div>
       <div class="chart">
-        <WeeklyOvertime />
-      </div>
-    </section>
-
-    <section class="charts">
-      <div class="chart">
-        <MonthlyWorkedTimeOverload />
-      </div>
-      <div class="chart">
-        <WeeklyAbsentTrend />
+        <WeeklyOvertime :filters="filters" />
       </div>
     </section>
 
     <section class="charts">
       <div class="chart">
-        <HeadcountPlan />
+        <MonthlyWorkedTimeOverload :filters="filters" />
+      </div>
+      <div class="chart">
+        <WeeklyAbsentTrend :filters="filters" />
+      </div>
+    </section>
+
+    <section class="charts">
+      <div class="chart">
+        <HeadcountPlan :filters="filters" />
       </div>
     </section>
   </div>
@@ -200,97 +249,6 @@ const selectEmployee = (employee) => {
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-button {
-  /* background-color: #007bff; */
-  color: white;
-  float: right; /* ปุ่มอยู่ชิดขวา */
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-
-.refresh-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.stats {
-  display: flex;
-  justify-content: space-around;
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  background-color: #f9f9f9;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 15px;
-  width: 180px;
-  transition: transform 0.2s;
-  justify-content: space-between;
-}
-
-/* .stat-card:hover {
-  transform: translateY(-5px);
-} */
-
-.icon-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-left: 20px;
-}
-
-.icon {
-  width: 48px;
-  height: 48px;
-}
-
-/* สไตล์สำหรับจุดสี */
-.status-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-}
-
-.content {
-  text-align: right;
-}
-
-h3 {
-  font-size: 20px;
-  font-weight: bold;
-  margin: 0;
-}
-
-h3.red {
-  color: #ff0000;
-}
-
-p {
-  font-size: 14px;
-  margin: 4px 0 0;
-}
-
-.sub-label {
-  font-size: 16px;
-  color: #888;
-}
-
 .skill-section-container {
   display: flex;
   flex-direction: row;
@@ -302,5 +260,4 @@ p {
 .skill-detail {
   flex: 1;
 }
-
 </style>

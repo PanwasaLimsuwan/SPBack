@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Api.Models;
 using Api.Jobs;
+// using Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,8 +32,8 @@ builder.Services.AddHttpClient(); // สำหรับ BackgroundService ใช
 // builder.Services.AddHostedService<GateToWorktimeJob>(); // ลงทะเบียน background job
 builder.Services.AddHostedService<CalculatedWorktimeJob>();
 builder.Services.AddHostedService<CalculatedOTJob>();
-// builder.Services.AddHostedService<CalculatedOTJob>();
-
+builder.Services.AddHostedService<Api.Services.CalculatedAttendanceJob>();
+// builder.Services.AddHostedService<CalculatedAttendanceJob>();
 
 var app = builder.Build();
 

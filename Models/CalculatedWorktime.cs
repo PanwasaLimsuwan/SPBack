@@ -7,7 +7,7 @@ namespace Api.Models
     {
         [Key]
         public int WorktimeID { get; set; }
-        public string EmpID { get; set; }
+        public int EmpID { get; set; }
         public DateTime Date { get; set; }
         public double WorkedHours { get; set; }
         public double OTHours { get; set; } // ✅ เพิ่มตรงนี้!

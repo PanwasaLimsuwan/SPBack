@@ -32,22 +32,25 @@ namespace Api.Jobs
                         var cmd = new SqlCommand(@"
                             SELECT 
                                 EmpID,
+                                FORMAT(Date, 'yyyy-MM') AS MonthYear,
                                 DATEPART(YEAR, Date) AS Year,
                                 DATEPART(WEEK, Date) AS WeekID,
                                 SUM(WorkedHours) AS TotalHours,
                                 SUM(OTHours) AS TotalOT,
                                 COUNT(DISTINCT CAST(Date AS DATE)) AS DaysWorked
                             FROM CalculatedWorktime
-                            GROUP BY EmpID, DATEPART(YEAR, Date), DATEPART(WEEK, Date)", conn);
+                            GROUP BY EmpID, FORMAT(Date, 'yyyy-MM'), DATEPART(YEAR, Date), DATEPART(WEEK, Date)", conn);
 
                         var reader = await cmd.ExecuteReaderAsync();
 
-                        var summaryList = new List<(string EmpID, int Year, int WeekID, double TotalHours, double TotalOT, int DaysWorked)>();
+                        var summaryList = new List<(int EmpID, string MonthYear, int Year, int WeekID, double TotalHours, double TotalOT, int DaysWorked)>();
 
                         while (await reader.ReadAsync())
                         {
                             summaryList.Add((
-                                reader["EmpID"].ToString(),
+                                Convert.ToInt32(reader["EmpID"]),
+                                // reader["EmpID"].ToString(),
+                                reader["MonthYear"].ToString(),
                                 Convert.ToInt32(reader["Year"]),
                                 Convert.ToInt32(reader["WeekID"]),
                                 Convert.ToDouble(reader["TotalHours"]),
@@ -73,11 +76,12 @@ namespace Api.Jobs
                             {
                                 var updateCmd = new SqlCommand(@"
                                     UPDATE EICC_Control
-                                    SET TotalHours = @TotalHours, DaysWorked = @DaysWorked, TotalOT = @TotalOT, Status = @Status
+                                    SET MonthYear = @MonthYear, TotalHours = @TotalHours, DaysWorked = @DaysWorked, TotalOT = @TotalOT, Status = @Status
                                     WHERE EmpID = @EmpID AND WeekID = @WeekID", conn);
 
                                 updateCmd.Parameters.AddWithValue("@EmpID", summary.EmpID);
                                 updateCmd.Parameters.AddWithValue("@WeekID", summary.WeekID);
+                                updateCmd.Parameters.AddWithValue("@MonthYear", summary.MonthYear);
                                 updateCmd.Parameters.AddWithValue("@TotalHours", summary.TotalHours);
                                 updateCmd.Parameters.AddWithValue("@DaysWorked", summary.DaysWorked);
                                 updateCmd.Parameters.AddWithValue("@TotalOT", summary.TotalOT);
@@ -88,11 +92,12 @@ namespace Api.Jobs
                             else
                             {
                                 var insertCmd = new SqlCommand(@"
-                                    INSERT INTO EICC_Control (EmpID, WeekID, TotalHours, DaysWorked, TotalOT, Status)
-                                    VALUES (@EmpID, @WeekID, @TotalHours, @DaysWorked, @TotalOT, @Status)", conn);
+                                    INSERT INTO EICC_Control (EmpID, WeekID, MonthYear, TotalHours, DaysWorked, TotalOT, Status)
+                                    VALUES (@EmpID, @WeekID, @MonthYear, @TotalHours, @DaysWorked, @TotalOT, @Status)", conn);
 
                                 insertCmd.Parameters.AddWithValue("@EmpID", summary.EmpID);
                                 insertCmd.Parameters.AddWithValue("@WeekID", summary.WeekID);
+                                insertCmd.Parameters.AddWithValue("@MonthYear", summary.MonthYear);
                                 insertCmd.Parameters.AddWithValue("@TotalHours", summary.TotalHours);
                                 insertCmd.Parameters.AddWithValue("@DaysWorked", summary.DaysWorked);
                                 insertCmd.Parameters.AddWithValue("@TotalOT", summary.TotalOT);

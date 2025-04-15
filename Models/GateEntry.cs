@@ -6,7 +6,7 @@ namespace Api.Models
     {
         [Key]
         public int GateEntryID { get; set; }
-        public string EmpID { get; set; }
+        public int EmpID { get; set; }
     public DateTime? EntryDateTime { get; set; }
     public DateTime? ExitDateTime { get; set; }
     public string GateNo { get; set; }

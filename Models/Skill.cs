@@ -16,7 +16,7 @@ namespace Api.Models
         // public string CourseGroup { get; set; } // กลุ่มหลักสูตร
         // public string Biz { get; set; }         // ธุรกิจ
         // public string Process { get; set; }     // กระบวนการ
-        public string SkillGroup { get; set; }  // กลุ่มทักษะ
+        // public string SkillGroup { get; set; }  // กลุ่มทักษะ
 
         public int Material { get; set; }       // ระดับทักษะใน Material
         public int Operation { get; set; }      // ระดับทักษะใน Operation

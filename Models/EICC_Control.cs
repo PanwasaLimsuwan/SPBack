@@ -6,7 +6,7 @@ namespace Api.Models
     {
         [Key]
         public int ControlID { get; set; }
-        public string EmpID { get; set; }
+        public int EmpID { get; set; }
         public int WeekID { get; set; }
         public float? TotalHours { get; set; }
         public int? DaysWorked { get; set; }

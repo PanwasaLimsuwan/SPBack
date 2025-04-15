@@ -66,7 +66,8 @@ namespace Api.Controllers
                     {
                         while (await existingReader.ReadAsync())
                         {
-                            var empId = existingReader["EmpID"].ToString();
+                            // var empId = existingReader["EmpID"].ToString();
+                            var empId = Convert.ToInt32(existingReader["EmpID"]);
                             var date = Convert.ToDateTime(existingReader["Date"]).Date;
                             var workedHours = Convert.ToDouble(existingReader["WorkedHours"]);
                             var otHours = Convert.ToDouble(existingReader["OTHours"]);

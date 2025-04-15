@@ -7,8 +7,8 @@ namespace Api.Models
     [Key]
     public int PlanID { get; set; }
     public DateTime? Date { get; set; }
-    public string EmpID { get; set; }
-    public string Attendance { get; set; }
+    // public int EmpID { get; set; }
+    // public string Attendance { get; set; }
     public string ShiftCode { get; set; }
     public string Shift { get; set; }
     public int? PlannedHeadcount { get; set; }

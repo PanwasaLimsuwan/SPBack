@@ -1,28 +1,17 @@
 <template>
   <div class="stat-card" v-for="(card, index) in stats" :key="index">
     <div class="icon-container">
-      <span
-        v-if="card.dotColor"
-        :style="{ backgroundColor: card.dotColor }"
-        class="status-dot"
-      ></span>
+      <span v-if="card.dotColor" :style="{ backgroundColor: card.dotColor }" class="status-dot"></span>
       <img v-else-if="card.icon" :src="card.icon" alt="Icon" class="icon" />
     </div>
     <div class="content">
-      <h3
-        :style="{
-          color: card.label === 'ต้องการพนักงาน' ? '#ff0000' : '#000',
-        }"
-      >
+      <h3 :style="{ color: card.label === 'ต้องการพนักงาน' ? '#ff0000' : '#000' }">
         {{ card.value }}
       </h3>
       <p>{{ card.label }}</p>
       <p v-if="card.subLabel" class="sub-label">{{ card.subLabel }}</p>
       <!-- ✅ แจ้งเตือนเฉพาะการ์ดนาฬิกา -->
-      <div
-        v-if="showBell && card.icon === 'clock.png'"
-        class="bell-alert"
-      >
+      <div v-if="showBell && card.icon === 'clock.png'" class="bell-alert">
         <img src="/bell.png" alt="Notification" class="bell-icon" />
         <span class="bell-text">ถึงเวลาเปลี่ยนกะ!</span>
       </div>
@@ -35,19 +24,38 @@ import axios from 'axios';
 import { useToast } from 'vue-toastification';
 
 export default {
+  props: {
+    filters: Object // ✅ รับ props filter เข้ามา
+  },
   data() {
     return {
       employees: [],
       showBell: false,
       hasAlerted: false,
       toast: null,
-      stats: [] // เราจะ set ข้อมูลใน updateStats()
+      stats: []
     };
+  },
+  watch: {
+    filters: {
+      handler() {
+        this.refreshAll(); // ✅ ถ้ามีการเปลี่ยน filter -> refresh ข้อมูล
+      },
+      deep: true
+    }
   },
   methods: {
     async fetchGateEntryData() {
       try {
-        const response = await axios.get('http://localhost:5000/api/GateEntry');
+        const response = await axios.get('http://localhost:5000/api/GateEntry', {
+          params: {
+            division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
+            department: this.filters.department !== 'ALL' ? this.filters.department : undefined,
+            section: this.filters.section !== 'ALL' ? this.filters.section : undefined,
+            biz: this.filters.biz !== 'ALL' ? this.filters.biz : undefined,
+            process: this.filters.process !== 'ALL' ? this.filters.process : undefined,
+          }
+        });
         this.employees = response.data;
         this.updateStats();
       } catch (error) {
@@ -88,25 +96,24 @@ export default {
     },
 
     startClock() {
-  setInterval(() => {
-    const now = new Date();
-    if (this.stats.length > 0) {
-      this.stats[0].value = now.toLocaleTimeString();
-      this.stats[0].subLabel = now.toLocaleDateString('th-TH');
-      this.updateShift(now); // อัปเดต SHIFT ด้วย
-    }
-  }, 1000); // ทุก 1 วินาที
-},
+      setInterval(() => {
+        const now = new Date();
+        if (this.stats.length > 0) {
+          this.stats[0].value = now.toLocaleTimeString();
+          this.stats[0].subLabel = now.toLocaleDateString('th-TH');
+          this.updateShift(now);
+        }
+      }, 1000);
+    },
 
     checkShiftAlert() {
-  const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
 
-        const inMorningShift = hour === 7 && minute >= 15 && minute <= 45;
-  const inNightShift = hour === 19 && minute >= 15 && minute <= 45;
-      // const inMorningShift = true; // mock test
-      // const inNightShift = false;
+      const inMorningShift = hour === 7 && minute >= 15 && minute <= 45;
+      const inNightShift = hour === 19 && minute >= 15 && minute <= 45;
+
       const isShiftTime = inMorningShift || inNightShift;
 
       this.showBell = isShiftTime;
@@ -123,28 +130,27 @@ export default {
       }
     },
 
-    refreshAll() {
-  this.fetchGateEntryData();
-  this.updateStats();
-  this.checkShiftAlert();
-},
+    async refreshAll() {
+      await this.fetchGateEntryData();
+      this.checkShiftAlert();
+    },
   },
 
   mounted() {
     this.toast = useToast();
-    this.fetchGateEntryData();
-    this.startClock();
-    this.checkShiftAlert();
     this.refreshAll();
+    this.startClock();
+
     setInterval(() => {
       this.checkShiftAlert();
       this.refreshAll();
-    }, 1000);
+    }, 10000); // ⏱️ 10 วินาทีพอ ไม่ต้องถี่ 1 วิครับ
   }
 };
 </script>
 
 <style scoped>
+/* (style เดิมของคุณ ไม่มีเปลี่ยน) */
 .bell-alert {
   display: flex;
   align-items: center;
@@ -229,15 +235,7 @@ p {
   color: #888;
 }
 
-.status-in-cleanroom {
-  color: green;
-}
-
-.status-out-cleanroom {
-  color: orange;
-}
-
-.status-missing {
-  color: red;
-}
+.status-in-cleanroom { color: green; }
+.status-out-cleanroom { color: orange; }
+.status-missing { color: red; }
 </style>

@@ -4,7 +4,8 @@ import axios from 'axios';
 
 const props = defineProps({
   selectedEmployee: Object,
-  selectedSkillFilter: Number
+  selectedSkillFilter: Number,
+  filters: Object, // ✅ เพิ่ม filters props
 });
 
 const emit = defineEmits(['selectEmployee']);
@@ -28,35 +29,51 @@ const skillLevels = [
   { label: "Expert (3)", value: 3 },
 ];
 
+// ✅ ฟังก์ชัน filter skill level และ selectedSkillFilter
 const filteredEmployees = computed(() => {
-  if (props.selectedSkillFilter == null) {
-    return employees.value;
-  } else if (props.selectedSkillFilter === 3) {
-    // Fully Skilled = ทุก skill ต้องเป็นระดับ 3
-    return employees.value.filter(emp =>
-      skills.every(skill => emp[skill] === 3)
-    );
-  } else if (props.selectedSkillFilter === 0) {
-    // Need Training = มี skill ที่เป็น level 0 หรือ 1 มากกว่า 2 ตัว
-    return employees.value.filter(emp => {
-      const midLevelCount = skills.reduce((count, skill) => {
-        const level = emp[skill];
-        return level === 0 || level === 1 ? count + 1 : count;
-      }, 0);
-      return midLevelCount > 2;
-    });
-  } else {
-    // กรณีเลือก filter อื่น ๆ เช่น 1 หรือ 2 แบบทั่วไป
-    return employees.value.filter(emp =>
-      skills.some(skill => emp[skill] === props.selectedSkillFilter)
+  let filtered = employees.value;
+
+  if (props.selectedSkillFilter != null) {
+    if (props.selectedSkillFilter === 3) {
+      filtered = filtered.filter(emp =>
+        skills.every(skill => emp[skill] === 3)
+      );
+    } else if (props.selectedSkillFilter === 0) {
+      filtered = filtered.filter(emp => {
+        const midLevelCount = skills.reduce((count, skill) => {
+          const level = emp[skill];
+          return level === 0 || level === 1 ? count + 1 : count;
+        }, 0);
+        return midLevelCount > 2;
+      });
+    } else {
+      filtered = filtered.filter(emp =>
+        skills.some(skill => emp[skill] === props.selectedSkillFilter)
+      );
+    }
+  }
+
+  if (selectedSkillLevel.value != null) {
+    filtered = filtered.filter(emp =>
+      skills.some(skill => emp[skill] === selectedSkillLevel.value)
     );
   }
+
+  return filtered;
 });
 
-
+// ✅ ฟังก์ชันโหลดข้อมูลจาก API พร้อม filters
 const fetchEmployeeSkills = async () => {
   try {
-    const response = await axios.get("http://localhost:5000/api/Skill");
+    const response = await axios.get("http://localhost:5000/api/Skill", {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      }
+    });
     employees.value = response.data;
   } catch (error) {
     console.error("Error fetching employee skills:", error);
@@ -82,9 +99,14 @@ const filterBySkillLevel = (level) => {
 const resetFilter = () => {
   selectedSkillLevel.value = null;
   emit('clear-skill');
-  // filteredEmployees.value = employees.value;
 };
 
+// ✅ ดูค่าจาก filter props ถ้ามีการเปลี่ยนแปลง -> reload data
+watch(() => props.filters, async () => {
+  await fetchEmployeeSkills();
+}, { deep: true });
+
+// ✅ โหลดข้อมูลเริ่มต้น
 onMounted(() => {
   fetchEmployeeSkills();
 });
@@ -161,7 +183,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: tomato;
+  background-color: #007BFF;
   color: white;
   border: none;
   border-radius: 25px;

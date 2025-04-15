@@ -1,55 +1,100 @@
 <template>
-  <div id="worktime-chart"></div>
+  <div id="worktime-chart-container">
+    <div class="filter-bar">
+      <label for="week-select">เลือกสัปดาห์:</label>
+      <select id="week-select" v-model="selectedWeek" @change="updateChart">
+        <option v-for="week in weekOptions" :key="week" :value="week">
+          {{ 'Week ' + week }}
+        </option>
+      </select>
+    </div>
+    <div v-if="hasData" id="worktime-chart"></div>
+    <div v-else class="no-data">No data to display</div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import Plotly from 'plotly.js';
 
-const workTimeData = ref([]);
-
-onMounted(async () => {
-  await fetchWorkTimeData();
-  updateChart();
-});
-
+const props = defineProps({ filters: Object });
 const emit = defineEmits(['filter']);
 
+const workTimeData = ref([]);
+const hasData = ref(true);
+const weekOptions = ref([]);
+const selectedWeek = ref(null);
+
+// ✅ Map วันเป็น label + สี
+const dayLabels = ['วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์'];
+const dayColors = ['#FFEB3B', '#E91E63', '#4CAF50', '#FF9800', '#2196F3'];
+
+// ✅ Fetch ข้อมูลหลัก
 const fetchWorkTimeData = async () => {
   try {
-    const response = await axios.get('http://localhost:5000/api/Worktime');
+    const response = await axios.get('http://localhost:5000/api/EICCControl', {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      },
+    });
+
     workTimeData.value = response.data;
+
+    const weeks = [...new Set(workTimeData.value.map(item => item.weekID))].sort((a, b) => a - b);
+    weekOptions.value = weeks;
+    selectedWeek.value = weeks[weeks.length - 1]; // Default: Week ล่าสุด
+
+    updateChart();
   } catch (error) {
     console.error('Error fetching work time data:', error);
   }
 };
 
+// ✅ Update Chart
 const updateChart = () => {
   if (!workTimeData.value.length) {
-    console.error('No work time data found.');
+    hasData.value = false;
+    Plotly.purge('worktime-chart');
     return;
   }
 
-  const { sortedWeeks, weeksFormatted, workTimeByWeek } = aggregateWorkTimeByWeek();
-  const otHours = sortedWeeks.map(week => workTimeByWeek[week].otHours);
+  // ✅ Filter ข้อมูลเฉพาะ week ที่เลือก
+  const selectedData = workTimeData.value
+    .filter(entry => entry.status === 'Active' && entry.weekID === selectedWeek.value)
+    .sort((a, b) => b.controlID - a.controlID) // controlID จากล่าสุดไปเก่าสุด
+    .slice(0, 5) // เอาแค่ 5 รายการ
+
+  if (!selectedData.length) {
+    hasData.value = false;
+    Plotly.purge('worktime-chart');
+    return;
+  }
+
+  hasData.value = true;
+
+  const otHours = selectedData.map(entry => entry.totalOT || 0);
 
   const chartData = [
     {
-      x: weeksFormatted,
+      x: dayLabels,
       y: otHours,
       name: 'OT Hours',
       type: 'bar',
       marker: {
-        color: otHours.map(h => h >= 20 ? '#f44336' : h >= 10 ? '#ffc107' : '#4caf50'),
+        color: dayColors,
       },
     },
   ];
 
   const layout = {
-    title: 'Weekly OT Hours (Only OT)',
-    xaxis: { title: 'Week' },
-    yaxis: { title: 'Total OT Hours', rangemode: 'tozero' },
+    title: `Weekly OverTime`,
+    xaxis: { title: 'วันในสัปดาห์' },
+    yaxis: { title: 'OT Hours', rangemode: 'tozero' },
     paper_bgcolor: '#fff',
     plot_bgcolor: '#f9f9f9',
     height: 400,
@@ -57,56 +102,54 @@ const updateChart = () => {
   };
 
   Plotly.newPlot('worktime-chart', chartData, layout).then(() => {
-    document.getElementById('worktime-chart').addEventListener('plotly_click', onBarClick);
+    document.getElementById('worktime-chart').on('plotly_click', onBarClick);
   });
 };
 
-const aggregateWorkTimeByWeek = () => {
-  const workTimeByWeek = {};
-
-  workTimeData.value.forEach(entry => {
-    if (entry.status !== 'Active') return;
-
-    const date = new Date(entry.date);
-    const weekNumber = getWeekNumber(date);
-    const weekKey = `${date.getFullYear()}-W${weekNumber}`;
-
-    if (!workTimeByWeek[weekKey]) {
-      workTimeByWeek[weekKey] = { otHours: 0 };
-    }
-
-    workTimeByWeek[weekKey].otHours += entry.oT_Hours || 0;
-  });
-
-  const sortedWeeks = Object.keys(workTimeByWeek).sort();
-  const weeksFormatted = sortedWeeks.map(week => {
-    const [year, weekNum] = week.split('-W');
-    return `Week ${weekNum}, ${year}`;
-  });
-
-  return { sortedWeeks, weeksFormatted, workTimeByWeek };
-};
-
-const getWeekNumber = (date) => {
-  const startDate = new Date(date.getFullYear(), 0, 1);
-  const diff = date - startDate;
-  const oneDay = 1000 * 60 * 60 * 24;
-  const dayOfYear = Math.floor(diff / oneDay);
-  return Math.ceil((dayOfYear + startDate.getDay() + 1) / 7);
-};
-
+// ✅ Click event (optional)
 const onBarClick = (eventData) => {
   if (eventData.points?.length) {
-    const selectedWeek = eventData.points[0].x;
-    console.log('Clicked on week:', selectedWeek);
-    emit('filter', selectedWeek);
+    emit('filter', selectedWeek.value);
   }
 };
+
+// ✅ Lifecycle
+onMounted(fetchWorkTimeData);
+watch(() => props.filters, fetchWorkTimeData, { deep: true });
 </script>
 
 <style scoped>
+#worktime-chart-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  min-height: 400px;
+}
+
+.filter-bar {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.filter-bar label {
+  margin-right: 8px;
+}
+
+.filter-bar select {
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
 #worktime-chart {
   width: 100%;
   height: 100%;
+}
+
+.no-data {
+  text-align: center;
+  color: #999;
+  font-size: 16px;
+  padding: 150px 0;
 }
 </style>

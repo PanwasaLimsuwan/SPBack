@@ -1,5 +1,5 @@
 <template>
-  <div v-if="employee" class="employee-section">
+  <div v-if="employee && isVisible" class="employee-section">
     <h3>{{ employee.firstName }} {{ employee.lastName }}</h3>
     <div v-for="s in skillMap" :key="s.key" class="skill-row">
       <p>{{ s.label }}: {{ getLevelLabel(employee[s.key]) }}</p>
@@ -13,6 +13,7 @@ export default {
   name: "EmployeeSkillSection",
   props: {
     employee: { type: Object, required: true },
+    filters: { type: Object, required: true } // ✅ เพิ่ม filters props
   },
   data() {
     return {
@@ -25,6 +26,21 @@ export default {
         { key: "inspection", label: "Inspection" },
       ],
     };
+  },
+  computed: {
+    // ✅ เพิ่ม computed ตรวจสอบว่า employee นี้ตรงกับ filter หรือไม่
+    isVisible() {
+      const { division, department, section, biz, process } = this.filters;
+      const emp = this.employee;
+
+      return (
+        (!division || division === "ALL" || emp.division === division) &&
+        (!department || department === "ALL" || emp.department === department) &&
+        (!section || section === "ALL" || emp.section === section) &&
+        (!biz || biz === "ALL" || emp.biz === biz) &&
+        (!process || process === "ALL" || emp.process === process)
+      );
+    },
   },
   methods: {
     barStyle(level) {

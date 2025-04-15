@@ -5,26 +5,33 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
 import axios from 'axios';
 import Plotly from 'plotly.js';
 
-// State
-const chartData = ref([]);
+const props = defineProps({
+  filters: Object
+});
 
-// ฟังก์ชันรวมข้อมูลตาม process และ skillGroup
+const emit = defineEmits(['barClick']);
+
+const rawData = ref([]);
+
+// รวมข้อมูล process + skill group
 const aggregate = (process, skill) => {
-  return chartData.value
+  return rawData.value
     .filter(item => item.process === process && item.skillGroup === skill)
     .reduce((sum, item) => sum + item.require, 0);
 };
 
-// ฟังก์ชันวาดกราฟ
+// วาดกราฟ
 const drawChart = () => {
-  const processes = [...new Set(chartData.value.map(d => d.process))];
-  const skills = [...new Set(chartData.value.map(d => d.skillGroup))];
+  if (!rawData.value.length) return;
 
-  const traces = skills.map(skill => ({
+  const processes = [...new Set(rawData.value.map(d => d.process))];
+  const skillGroups = [...new Set(rawData.value.map(d => d.skillGroup))];
+
+  const traces = skillGroups.map(skill => ({
     x: processes,
     y: processes.map(p => aggregate(p, skill)),
     name: skill,
@@ -41,18 +48,48 @@ const drawChart = () => {
     yaxis: { title: 'Required Employees' }
   };
 
-  Plotly.newPlot('required-bar-chart', traces, layout);
+  Plotly.newPlot('required-bar-chart', traces, layout).then(() => {
+    const chart = document.getElementById('required-bar-chart');
+    chart.on('plotly_click', handleBarClick);
+  });
 };
 
-// ดึงข้อมูลเมื่อ component โหลด
-onMounted(async () => {
+// Handle click บนกราฟ
+const handleBarClick = (event) => {
+  const skill = event.points[0].data.name;
+  const process = event.points[0].x;
+
+  emit('barClick', { skill, process });
+};
+
+// ดึงข้อมูล
+const fetchData = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/ManpowerReq');
-    chartData.value = res.data;
+    const res = await axios.get("http://localhost:5000/api/ManpowerReq", {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      }
+    });
+    rawData.value = res.data;
+    await nextTick();
     drawChart();
   } catch (err) {
-    console.error('Error fetching data:', err);
+    console.error("Error fetching data:", err);
   }
+};
+
+// ดู filter ถ้าเปลี่ยน reload
+watch(() => props.filters, async () => {
+  await fetchData();
+}, { deep: true });
+
+// เริ่มต้น component
+onMounted(async () => {
+  await fetchData();
 });
 </script>
 

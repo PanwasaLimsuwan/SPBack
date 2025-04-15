@@ -2,55 +2,73 @@
   <div>
     <div id="required-bar-chart"></div>
 
-    <div v-if="filteredEmployees.length" class="employee-recommendations">
-      <h3>แนะนำพนักงาน</h3>
+    <div class="employee-recommendations">
+  <h3>แนะนำพนักงาน</h3>
 
-      <p>
-        <strong>Process:</strong> {{ selectedProcess }} |
-        <strong>Skill:</strong> {{ selectedSkill }}
-      </p>
+  <p>
+    <strong>Process:</strong> {{ selectedProcess || '-' }} |
+    <strong>Skill:</strong> {{ selectedSkill || '-' }}
+  </p>
 
-      <button class="refresh-skill-btn" @click="resetSkillFilter" title="รีเซตฟิลเตอร์">
-        <img src="refresh.png" alt="Refresh Icon" class="icon" />
-        <span>Refresh</span>
-      </button>
+  <button class="refresh-skill-btn" @click="resetSkillFilter" title="รีเซตฟิลเตอร์">
+    <img src="refresh.png" alt="Refresh Icon" class="icon" />
+    <span>Refresh</span>
+  </button>
 
-      <table>
-        <thead>
-          <tr>
-            <th>No.</th>
-            <th>EmpID</th>
-            <th>Firstname</th>
-            <th>Lastname</th>
-            <th>Work Time</th>
-            <th>Skill</th>
-            <th>Select</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(employee, index) in filteredEmployees" :key="index">
-            <td>{{ index + 1 }}</td>
-            <td>{{ employee.empID }}</td>
-            <td>{{ employee.firstName }}</td>
-            <td>{{ employee.lastName }}</td>
-            <td>{{ employee.workTime }}</td>
-            <td>{{ selectedSkill }}</td>
-            <td>
-              <button @click="$emit('selectEmployee', employee)">
-                <img src="skill.png" alt="Skill" class="skill-icon" />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+  <table>
+    <thead>
+      <tr>
+        <th>No.</th>
+        <th>EmpID</th>
+        <th>Firstname</th>
+        <th>Lastname</th>
+        <th>Work Time</th>
+        <th>Skill</th>
+        <th>Select</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-if="!selectedSkill && !selectedProcess">
+        <td colspan="7" style="text-align: center; padding: 20px;">
+          กรุณาเลือก Process และ Skill จากกราฟทางด้านซ้ายเพื่อใช้ในการแนะนำพนักงาน
+        </td>
+      </tr>
+
+      <tr v-else-if="filteredEmployees.length === 0">
+        <td colspan="7" style="text-align: center; padding: 20px;">
+          ไม่พบพนักงานที่ตรงกับเงื่อนไข กรุณาเลือก Process และ Skill อื่น
+        </td>
+      </tr>
+
+      <tr v-else v-for="(employee, index) in filteredEmployees" :key="index">
+        <td>{{ index + 1 }}</td>
+        <td>{{ employee.empID }}</td>
+        <td>{{ employee.firstName }}</td>
+        <td>{{ employee.lastName }}</td>
+        <td>{{ employee.totalTime }}</td>
+        <td>{{ selectedSkill }}</td>
+        <td>
+          <button @click="$emit('selectEmployee', employee)">
+            <img src="skill.png" alt="Skill" class="skill-icon" />
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
 import axios from 'axios';
 import Plotly from 'plotly.js';
+
+// ✅ รับ props filter จาก parent component
+const props = defineProps({
+  filters: Object
+});
 
 const emit = defineEmits(['selectEmployee']);
 
@@ -61,13 +79,17 @@ const selectedSkill = ref(null);
 const selectedProcess = ref(null);
 const filteredEmployees = ref([]);
 
+// ✅ รวมข้อมูล process + skill group
 const aggregate = (process, skill) => {
   return rawData.value
     .filter(item => item.process === process && item.skillGroup === skill)
     .reduce((sum, item) => sum + item.require, 0);
 };
 
+// ✅ วาดกราฟ
 const drawChart = () => {
+  if (!rawData.value.length) return;
+
   const processes = [...new Set(rawData.value.map(d => d.process))];
   const skillGroups = [...new Set(rawData.value.map(d => d.skillGroup))];
 
@@ -94,6 +116,7 @@ const drawChart = () => {
   });
 };
 
+// ✅ Handle click บนกราฟ
 const handleBarClick = (event) => {
   const skill = event.points[0].data.name;
   const process = event.points[0].x;
@@ -101,45 +124,100 @@ const handleBarClick = (event) => {
   selectedSkill.value = skill;
   selectedProcess.value = process;
 
-  const filtered = skills.value.filter(emp => {
-    const empWorktime = worktime.value.find(w => parseInt(w.empID) === emp.empID);
-    const totalTime = empWorktime ? empWorktime.workedHours + empWorktime.oT_Hours + empWorktime.overloadHours : 0;
-    return emp.skillGroup === skill && totalTime <= 60;
-  }).map(emp => {
-    const empWorktime = worktime.value.find(w => parseInt(w.empID) === emp.empID);
+  const filtered = skills.value
+  .map(emp => {
+    const empWorktimeList = worktime.value.filter(w => w.empID === emp.empID);
+    const totalTime = empWorktimeList.reduce((sum, w) => sum + (w.totalHours ?? 0), 0);
+
     return {
       ...emp,
-      workTime: empWorktime ? (empWorktime.workedHours + empWorktime.oT_Hours + empWorktime.overloadHours) : 0
+      empID: emp.empID,
+      process: emp.process,
+      totalTime: totalTime,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      skillLevel: emp[selectedSkill.value.toLowerCase()] ?? 0
     };
+  })
+  .filter(emp => {
+    return emp.skillGroup === selectedSkill.value && emp.process === selectedProcess.value && emp.totalTime <= 60;
+  })
+  .sort((a, b) => {
+    // ✅ เรียง skill level สูง -> ต่ำ
+    if (b.skillLevel !== a.skillLevel) return b.skillLevel - a.skillLevel;
+    // ✅ ถ้า skill level เท่ากัน เรียง totalHours เหลือมากก่อน
+    return (60 - b.totalTime) - (60 - a.totalTime);
   });
 
-  filteredEmployees.value = filtered;
+filteredEmployees.value = filtered;
+
 };
 
+// ✅ Reset filter
 const resetSkillFilter = () => {
   filteredEmployees.value = [];
   selectedSkill.value = null;
   selectedProcess.value = null;
 };
 
-onMounted(async () => {
+// ✅ ดึงข้อมูล API ทั้ง 3
+const fetchData = async () => {
   try {
     const [req, skillRes, worktimeRes] = await Promise.all([
-      axios.get("http://localhost:5000/api/ManpowerReq"),
-      axios.get("http://localhost:5000/api/Skill"),
-      axios.get("http://localhost:5000/api/Worktime")
+      axios.get("http://localhost:5000/api/ManpowerReq", {
+        params: {
+          division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+          department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+          section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+          biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+          process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+        }
+      }),
+      axios.get("http://localhost:5000/api/Skill", {
+        params: {
+          division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+          department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+          section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+          biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+          process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+        }
+      }),
+      axios.get("http://localhost:5000/api/EICCControl", {
+        params: {
+          division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+          department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+          section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+          biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+          process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+        }
+      }),
     ]);
+
     rawData.value = req.data;
     skills.value = skillRes.data;
     worktime.value = worktimeRes.data;
+
+    await nextTick();
     drawChart();
   } catch (err) {
     console.error("Error fetching data:", err);
   }
+};
+
+// ✅ ดู filter ถ้าเปลี่ยน -> reload
+watch(() => props.filters, async () => {
+  await fetchData();
+  resetSkillFilter();
+}, { deep: true });
+
+// ✅ เริ่มต้น component
+onMounted(async () => {
+  await fetchData();
 });
 </script>
 
 <style scoped>
+/* สไตล์เดิมของคุณ */
 .skill-icon {
   width: 30px;
   height: 30px;
@@ -149,7 +227,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: tomato;
+  background-color: #007BFF;
   color: white;
   border: none;
   border-radius: 25px;

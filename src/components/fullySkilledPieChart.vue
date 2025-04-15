@@ -1,16 +1,22 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
 import Plotly from 'plotly.js';
 
 const emit = defineEmits(['filter-skills']);
+
+// ✅ รับ props filters
+const props = defineProps({
+  filters: Object
+});
 
 const months = ref([]);
 const fullySkilledCounts = ref([]);
 const needTrainingCounts = ref([]);
 
+// ✅ ฟังก์ชัน fetch data พร้อม filter
 const fetchSkillData = async () => {
   try {
-    const response = await fetch('http://localhost:5000/api/Skill');
+    const response = await fetch(`http://localhost:5000/api/Skill?division=${props.filters.division !== 'ALL' ? props.filters.division : ''}&department=${props.filters.department !== 'ALL' ? props.filters.department : ''}&section=${props.filters.section !== 'ALL' ? props.filters.section : ''}&biz=${props.filters.biz !== 'ALL' ? props.filters.biz : ''}&process=${props.filters.process !== 'ALL' ? props.filters.process : ''}`);
     const data = await response.json();
 
     const skillCategories = {
@@ -57,23 +63,30 @@ const fetchSkillData = async () => {
       showlegend: true,
     };
 
+    await nextTick();
     Plotly.newPlot('fully-skilled-pie-chart', [trace], layout);
 
     const chart = document.getElementById('fully-skilled-pie-chart');
-   chart.on('plotly_click', (data) => {
-  const clickedLabel = data.points[0].label;
-  if (clickedLabel === 'Fully Skilled') {
-    emit('filter-skills', 3); // Fully Skilled = ทุกสกิลระดับ 3
-  } else if (clickedLabel === 'Need Training') {
-    emit('filter-skills', 0); // Need Training = มีสกิลต่ำกว่า 3
-  }
-});
+    chart.on('plotly_click', (data) => {
+      const clickedLabel = data.points[0].label;
+      if (clickedLabel === 'Fully Skilled') {
+        emit('filter-skills', 3); // Fully Skilled = ทุกสกิลระดับ 3
+      } else if (clickedLabel === 'Need Training') {
+        emit('filter-skills', 0); // Need Training = มีสกิลต่ำกว่า 3
+      }
+    });
 
   } catch (error) {
     console.error('Error fetching skill data:', error);
   }
 };
 
+// ✅ ดู filter ถ้าเปลี่ยน -> reload
+watch(() => props.filters, async () => {
+  await fetchSkillData();
+}, { deep: true });
+
+// ✅ เริ่มต้น component
 onMounted(() => {
   fetchSkillData();
 });

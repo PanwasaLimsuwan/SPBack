@@ -86,7 +86,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: tomato;
+  background-color: #007BFF;
   color: white;
   border: none;
   border-radius: 25px;

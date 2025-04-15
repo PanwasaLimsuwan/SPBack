@@ -1,5 +1,11 @@
 <template>
   <div class="chart-container">
+    <div class="filter-bar">
+      <label for="week-select">Select Week:</label>
+      <select id="week-select" v-model="selectedWeekID" @change="onWeekChange">
+        <option v-for="week in weekOptions" :key="week" :value="week">{{ week }}</option>
+      </select>
+    </div>
     <div id="worked-time-chart" class="scrollable-chart"></div>
   </div>
 </template>
@@ -10,23 +16,78 @@ import axios from "axios";
 
 export default {
   name: "WorkedTimeChart",
+  props: {
+    filters: Object,
+  },
   data() {
     return {
       worktime: [],
       employeeInfo: [],
       combinedData: [],
+      weekOptions: [],
+      selectedWeekID: null,
     };
   },
   async mounted() {
-    await this.fetchData();
-    this.prepareData();
-    this.drawChart();
+    await this.fetchWeekOptions();
+    this.selectedWeekID = this.weekOptions[this.weekOptions.length - 1]; // default สัปดาห์ล่าสุด
+    await this.refreshChart();
+  },
+  watch: {
+    filters: {
+      handler() {
+        this.fetchWeekOptions().then(() => {
+          this.selectedWeekID = this.weekOptions[this.weekOptions.length - 1];
+          this.refreshChart();
+        });
+      },
+      deep: true,
+    },
   },
   methods: {
+    async fetchWeekOptions() {
+      try {
+        const response = await axios.get("http://localhost:5000/api/EICCControl", {
+          params: {
+            division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
+            department: this.filters.department !== 'ALL' ? this.filters.department : undefined,
+            section: this.filters.section !== 'ALL' ? this.filters.section : undefined,
+            biz: this.filters.biz !== 'ALL' ? this.filters.biz : undefined,
+            process: this.filters.process !== 'ALL' ? this.filters.process : undefined,
+            weekID: this.selectedWeekID
+          },
+        });
+        const weeks = [...new Set(response.data.map(item => item.weekID))].sort((a, b) => a - b);
+        this.weekOptions = weeks;
+      } catch (error) {
+        console.error("Error fetching weeks:", error);
+      }
+    },
+
+    onWeekChange() {
+      this.refreshChart();
+    },
+
+    async refreshChart() {
+      await this.fetchData();
+      this.prepareData();
+      await this.$nextTick();
+      this.drawChart();
+    },
+
     async fetchData() {
       try {
         const [workRes, empRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/Worktime"),
+          axios.get("http://localhost:5000/api/EICCControl", {
+            params: {
+              division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
+              department: this.filters.department !== 'ALL' ? this.filters.department : undefined,
+              section: this.filters.section !== 'ALL' ? this.filters.section : undefined,
+              biz: this.filters.biz !== 'ALL' ? this.filters.biz : undefined,
+              process: this.filters.process !== 'ALL' ? this.filters.process : undefined,
+              weekID: this.selectedWeekID,
+            },
+          }),
           axios.get("http://localhost:5000/api/EmployeeInfo"),
         ]);
         this.worktime = workRes.data;
@@ -37,56 +98,76 @@ export default {
     },
 
     prepareData() {
-  const groupedByEmp = {};
+      const groupedByEmp = {};
 
-  this.worktime
-    .filter(w => w.status === "Active")
-    .forEach(w => {
-      const empID = w.empID;
-      const worked = parseFloat(w.workedHours) || 0;
+      this.worktime
+        .filter(w => w.status === "Active")
+        .forEach(w => {
+          const empID = w.empID;
+          const worked = parseFloat(w.totalHours) || 0;
 
-      if (!groupedByEmp[empID]) {
-        groupedByEmp[empID] = { totalWorked: 0 };
-      }
+          if (!groupedByEmp[empID]) {
+            groupedByEmp[empID] = { totalWorked: 0 };
+          }
 
-      groupedByEmp[empID].totalWorked += worked;
-    });
+          groupedByEmp[empID].totalWorked += worked;
+        });
 
-    this.combinedData = Object.keys(groupedByEmp).map(empID => {
-  const emp = this.employeeInfo.find(e => `${e.empID}` === `${empID}`);
-  const name = emp ? `${emp.firstName} ${emp.lastName}` : `Emp ${empID}`;
+      const employeeMap = this.employeeInfo.reduce((map, e) => {
+        map[e.empID] = e;
+        return map;
+      }, {});
 
-  const total = groupedByEmp[empID].totalWorked;
-  const percent = (total / 60) * 100;
+      this.combinedData = Object.keys(groupedByEmp).map(empID => {
+        const emp = employeeMap[empID];
+        const name = emp ? `${emp.firstName} ${emp.lastName}` : `Emp ${empID}`;
 
-  let color = "#4caf50"; // เขียว
-  if (percent >= 90) color = "#f44336"; // แดง
-  else if (percent >= 80) color = "#ffc107"; // เหลือง
+        const total = groupedByEmp[empID].totalWorked;
+        const percent = (total / 60) * 100;
 
-  return { name, percent, color };
-});
+        let color = "#4caf50"; // Green
+        if (percent >= 90) color = "#f44336"; // Red
+        else if (percent >= 80) color = "#ffc107"; // Yellow
 
-// ✅ เรียงลำดับสี และเปอร์เซ็นต์จากมาก → น้อย
-this.combinedData.sort((a, b) => {
-  const getRank = (color) => {
-    if (color === "#f44336") return 1;   // แดง
-    if (color === "#ffc107") return 2;   // เหลือง
-    return 3;                            // เขียว
-  };
+        return { name, percent, color };
+      });
 
-  const rankA = getRank(a.color);
-  const rankB = getRank(b.color);
+      this.combinedData.sort((a, b) => {
+        const getRank = (color) => {
+          if (color === "#f44336") return 1;
+          if (color === "#ffc107") return 2;
+          return 3;
+        };
 
-  if (rankA !== rankB) {
-    return rankA - rankB; // เรียงตามสี
-  } else {
-    return b.percent - a.percent; // ถ้าสีเท่ากัน เรียงตามเปอร์เซ็นต์
-  }
-});
+        const rankA = getRank(a.color);
+        const rankB = getRank(b.color);
 
-},
+        return rankA !== rankB ? rankA - rankB : b.percent - a.percent;
+      });
+    },
 
     drawChart() {
+      if (!document.getElementById("worked-time-chart")) {
+        console.error("Chart container not found!");
+        return;
+      }
+
+      if (this.combinedData.length === 0) {
+        Plotly.newPlot("worked-time-chart", [], {
+          title: "No data to display",
+          xaxis: { visible: false },
+          yaxis: { visible: false },
+          annotations: [{
+            text: "No data to display",
+            xref: "paper",
+            yref: "paper",
+            showarrow: false,
+            font: { size: 16 },
+          }],
+        });
+        return;
+      }
+
       const chartData = [
         {
           x: this.combinedData.map(emp => emp.percent),
@@ -106,7 +187,7 @@ this.combinedData.sort((a, b) => {
         height: Math.max(400, this.combinedData.length * 40),
         margin: { l: 200, r: 20, t: 50, b: 50 },
         xaxis: { title: "Percentage", range: [0, 120] },
-        yaxis: { automargin: true, autorange: "reversed" }, // 👈 พลิกลำดับแกน Y
+        yaxis: { automargin: true, autorange: "reversed" },
         plot_bgcolor: "#f9f9f9",
         paper_bgcolor: "#fff",
       };
@@ -125,6 +206,21 @@ this.combinedData.sort((a, b) => {
   background: #f0f4f8;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.filter-bar {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.filter-bar label {
+  margin-right: 8px;
+}
+
+.filter-bar select {
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 #worked-time-chart {

@@ -126,7 +126,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: tomato;
+  background-color: blue;
+  /* background-color: tomato; */
   color: white;
   border: none;
   border-radius: 25px;

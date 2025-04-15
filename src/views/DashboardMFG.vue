@@ -192,6 +192,59 @@ const selectEmployee = (employee) => {
 </template>
 
 <style>
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #e0e0e0;
+  border-radius: 0 0 8px 8px;
+}
+
+.logo {
+  width: 150px;
+}
+
+.filters-wrapper {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 5px;
+  min-width: 600px;
+}
+
+.filters select,
+.filters input {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+  transition: border-color 0.3s, background-color 0.3s;
+  min-width: 160px;
+}
+
+.filters select:focus,
+.filters input:focus {
+  border-color: #007bff;
+  background-color: #fff;
+  outline: none;
+}
+
+.filters input {
+  flex: 1;
+}
+
 .dashboard {
   font-family: Arial, sans-serif;
   padding: 20px;

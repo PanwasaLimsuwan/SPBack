@@ -70,6 +70,7 @@ const getStatusClass = (status) => {
     'status-in-cleanroom': 'status-in-cleanroom',
     'status-out-cleanroom': 'status-out-cleanroom',
     'status-missing': 'status-missing',
+    'status-get-off': 'status-get-off',
   }[status] || '';
 };
 
@@ -79,6 +80,7 @@ const getStatusLabel = (status) => {
     'status-in-cleanroom': 'In Cleanroom',
     'status-out-cleanroom': 'Out Cleanroom',
     'status-missing': 'Missing',
+    'status-get-off': 'Get Off',
   }[status] || status;
 };
 
@@ -102,11 +104,12 @@ onMounted(() => {
             <th>EmpID</th>
             <th>Firstname</th>
             <th>Lastname</th>
-            <th class="datetime-column">Date-time</th>
+            <th class="datetime-column">Check in time</th>
+            <th class="datetime-column">Check out time</th>
             <th>Gate No</th>
-            <th>Process</th>
-            <th>CourseGroup</th>
-            <th>WorkGroup</th>
+            <!-- <th>Process</th> -->
+            <!-- <th>CourseGroup</th>
+            <th>WorkGroup</th> -->
             <th>Status</th>
           </tr>
         </thead>
@@ -116,10 +119,11 @@ onMounted(() => {
             <td>{{ employee.firstName }}</td>
             <td>{{ employee.lastName }}</td>
             <td class="datetime-column">{{ employee.entryDateTime || '-' }}</td>
+            <td class="datetime-column">{{ employee.exitDateTime || '-' }}</td>
             <td>{{ employee.gateNo || '-' }}</td>
-            <td>{{ employee.process || '-' }}</td>
+            <!-- <td>{{ employee.process || '-' }}</td>
             <td>{{ employee.courseGroup || '-' }}</td>
-            <td>{{ employee.workGroup || '-' }}</td>
+            <td>{{ employee.workGroup || '-' }}</td> -->
             <td :class="getStatusClass(employee.status)">
               {{ getStatusLabel(employee.status) }}
             </td>
@@ -135,7 +139,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: tomato;
+  /* background-color: tomato; */
+  background-color: #007BFF;
   color: white;
   border: none;
   border-radius: 25px;
@@ -204,6 +209,11 @@ th {
 
 .status-missing {
   color: red;
+  font-weight: bold;
+}
+
+.status-get-off {
+  color: blue;
   font-weight: bold;
 }
 

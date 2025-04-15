@@ -3,28 +3,45 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
 import Plotly from 'plotly.js';
+import axios from 'axios';
+
+// ✅ รับ props filter
+const props = defineProps({
+  filters: {
+    type: Object,
+    default: () => ({}),
+  },
+});
 
 const months = ref([]);
 const overloads = ref([]);
 
 const fetchWorkTimeData = async () => {
   try {
-    const response = await fetch('http://localhost:5000/api/Worktime');
-    const data = await response.json();
+    const response = await axios.get('http://localhost:5000/api/EICCControl', {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      },
+    });
+
+    const data = response.data;
 
     const monthlyData = {};
 
     data.forEach(entry => {
       if (entry.status !== 'Active') return;
 
-      const dateObj = new Date(entry.date);
-      const monthKey = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}`;
-      const empID = entry.empID;
+      const monthKey = entry.monthYear;
 
-      const worked = parseFloat(entry.workedHours) || 0;
-      const ot = parseFloat(entry.oT_Hours ?? entry.OT_Hours ?? entry.ot_Hours) || 0;
+      const empID = entry.empID;
+      const worked = parseFloat(entry.totalHours) || 0;
+      const ot = parseFloat(entry.totalOT) || 0;
       const total = worked + ot;
 
       if (!monthlyData[monthKey]) monthlyData[monthKey] = {};
@@ -38,7 +55,7 @@ const fetchWorkTimeData = async () => {
       let overloadSum = 0;
       for (const empID in monthlyData[month]) {
         const total = monthlyData[month][empID];
-        const overload = total > 60 ? total - 60 : 0;
+        const overload = total > 240 ? total - 240 : 0; // ✅ เช็คเกิน 240
         overloadSum += overload;
       }
       monthlyOverload[month] = overloadSum;
@@ -63,7 +80,7 @@ const drawChart = () => {
   };
 
   const layout = {
-    title: 'Monthly Overload (Worktime + OT - 60 hrs)',
+    title: 'Monthly Overload (Over 240 Hours)',
     xaxis: { title: 'Month' },
     yaxis: { title: 'Total Overload Hours' },
     margin: { l: 60, r: 30, t: 50, b: 60 },
@@ -74,7 +91,15 @@ const drawChart = () => {
   Plotly.newPlot('monthly-overload-chart', [trace], layout, { responsive: true });
 };
 
+// ✅ Lifecycle
 onMounted(fetchWorkTimeData);
+
+// ✅ watch filter → reload data + update chart
+watch(() => props.filters, async () => {
+  await fetchWorkTimeData();
+  await nextTick();
+  drawChart();
+}, { deep: true });
 </script>
 
 <style scoped>

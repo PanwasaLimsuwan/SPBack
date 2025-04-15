@@ -3,32 +3,50 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
 import Plotly from 'plotly.js';
 import axios from 'axios';
 
-const absentData = ref([]);
-
-onMounted(async () => {
-  await fetchAbsentData();
-  drawChart(); // เรียกใช้ชื่อฟังก์ชันใหม่
+// ✅ รับ props filters
+const props = defineProps({
+  filters: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
+const absentData = ref([]);
+
+// ฟังก์ชันดึงข้อมูลจาก backend
 const fetchAbsentData = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/GateEntry');
+    const res = await axios.get('http://localhost:5000/api/Attendance', {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      },
+    });
+
+    // ตรวจสอบข้อมูลที่ได้รับจาก backend
+    console.log(res.data);
     absentData.value = extractAbsentDates(res.data);
+    await nextTick();
+    drawChart();
   } catch (err) {
     console.error('❌ Error fetching absent data:', err);
   }
 };
 
+// ฟังก์ชันแยกข้อมูลการขาดงานออกมา
 const extractAbsentDates = (data) => {
   return data.map(emp => {
     const absentDates = [];
 
-    if (emp.status === 'status-missing' && emp.entryDateTime) {
-      const fixedDate = emp.entryDateTime.replace(/-/g, '/');
+    if (emp.status === 'late' || emp.status === 'normal') {  // เช็คการขาดงานหรือสถานะปกติ
+      const fixedDate = emp.date.replace(/-/g, '/');  // แปลงวันที่ที่ได้รับจาก API
       const dateObj = new Date(fixedDate);
       if (!isNaN(dateObj)) {
         absentDates.push(dateObj);
@@ -39,6 +57,7 @@ const extractAbsentDates = (data) => {
   });
 };
 
+// ฟังก์ชันคำนวณหมายเลขสัปดาห์จากวันที่
 const getWeekNumber = (date) => {
   const startDate = new Date(date.getFullYear(), 0, 1);
   const diff = date - startDate;
@@ -46,6 +65,7 @@ const getWeekNumber = (date) => {
   return Math.ceil(diff / oneDay / 7);
 };
 
+// ฟังก์ชันสร้างกราฟ
 const drawChart = () => {
   const weeklyCount = {};
   const weeksSet = new Set();
@@ -58,6 +78,9 @@ const drawChart = () => {
       weeklyCount[week]++;
     });
   });
+
+  // ตรวจสอบข้อมูลใน weeklyCount และ weeksSet
+  console.log("Weekly Count:", weeklyCount);
 
   const sortedWeeks = Array.from(weeksSet).sort((a, b) => a - b);
   const weeksFormatted = sortedWeeks.map(w => `Week ${w}`);
@@ -74,7 +97,7 @@ const drawChart = () => {
   };
 
   const layout = {
-    title: 'Weekly Absent',
+    title: 'Weekly Absent Trend',
     barmode: 'group',
     height: 400,
     xaxis: { title: 'Week Number', dtick: 1 },
@@ -85,8 +108,17 @@ const drawChart = () => {
     margin: { l: 60, r: 20, t: 50, b: 60 },
   };
 
+  // ตรวจสอบว่า div มี ID ที่ถูกต้อง
   Plotly.newPlot('weekly-absent-trend', [trace], layout);
 };
+
+// ✅ Lifecycle
+onMounted(fetchAbsentData);
+
+// ✅ Watch filters → refetch data + update chart
+watch(() => props.filters, async () => {
+  await fetchAbsentData();
+}, { deep: true });
 </script>
 
 <style scoped>

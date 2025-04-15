@@ -3,28 +3,49 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import Plotly from 'plotly.js';
 
+// ✅ รับ props filters จาก parent
+const props = defineProps({
+  filters: Object
+});
+
 const absentSummary = ref([]);
 
+// ✅ โหลดข้อมูลเมื่อ component mount
 onMounted(async () => {
   await fetchAbsentData();
   drawMonthlyChart();
 });
 
-// ดึงข้อมูล GateEntry → กรองเฉพาะ status-missing
+// ✅ ดูว่า filter เปลี่ยนไหม ถ้าเปลี่ยนให้ fetch ใหม่
+watch(() => props.filters, async () => {
+  await fetchAbsentData();
+  drawMonthlyChart();
+}, { deep: true });
+
+// ✅ ดึงข้อมูล GateEntry → กรองเฉพาะ status-missing พร้อมส่ง filters
 const fetchAbsentData = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/GateEntry');
+    const res = await axios.get('http://localhost:5000/api/GateEntry', {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      },
+    });
+
     const allEmployees = res.data || [];
 
-    // คัดเฉพาะพนักงานที่มี status-missing
+    // ✅ กรองเฉพาะ status-missing
     const dates = allEmployees
       .filter(emp => emp.status === 'status-missing' && emp.entryDateTime)
       .map(emp => new Date(emp.entryDateTime.replace(/-/g, '/')))
-      .filter(date => !isNaN(date.getTime())); // กรองค่าที่ parse ไม่ได้
+      .filter(date => !isNaN(date.getTime()));
 
     absentSummary.value = countByMonth(dates);
   } catch (err) {
@@ -32,7 +53,7 @@ const fetchAbsentData = async () => {
   }
 };
 
-// รวมจำนวนการขาดงานตามเดือน
+// ✅ รวมจำนวนการขาดงานตามเดือน
 const countByMonth = (dateList) => {
   const counts = {};
 
@@ -48,15 +69,20 @@ const countByMonth = (dateList) => {
   }));
 };
 
-// แปลงรูปแบบเดือน เช่น "2023-11" → "Nov 2023"
+// ✅ แปลงรูปแบบเดือน
 const formatMonth = (monthStr) => {
   const [year, month] = monthStr.split('-');
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[parseInt(month) - 1]} ${year}`;
 };
 
-// วาดกราฟ
+// ✅ วาดกราฟ
 const drawMonthlyChart = () => {
+  if (!absentSummary.value.length) {
+    Plotly.purge('monthly-absent-summary');
+    return;
+  }
+
   const x = absentSummary.value.map(item => item.label);
   const y = absentSummary.value.map(item => item.count);
 

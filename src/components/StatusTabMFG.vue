@@ -68,6 +68,7 @@ export default {
       const inCleanroom = this.employees.filter(e => e.status === "status-in-cleanroom").length;
       const outCleanroom = this.employees.filter(e => e.status === "status-out-cleanroom").length;
       const missing = this.employees.filter(e => e.status === "status-missing").length;
+      const getoff = this.employees.filter(e => e.status === "status-get-off").length;
       const need = missing;
 
       const currentTime = new Date();
@@ -83,6 +84,7 @@ export default {
         { value: inCleanroom, label: "In Cleanroom", subLabel: "คน", dotColor: "#00cc66" },
         { value: outCleanroom, label: "Out Cleanroom", subLabel: "คน", dotColor: "#ffcc00" },
         { value: missing, label: "ขาดงาน", subLabel: "คน", dotColor: "#ff6666" },
+        { value: getoff, label: "Get Off", subLabel: "คน", dotColor: "#3399ff" },
         { value: need, label: "ต้องการพนักงาน", subLabel: "คน" }
       ];
 
@@ -238,4 +240,5 @@ p {
 .status-in-cleanroom { color: green; }
 .status-out-cleanroom { color: orange; }
 .status-missing { color: red; }
+.stat-get-off { color: blue; }
 </style>

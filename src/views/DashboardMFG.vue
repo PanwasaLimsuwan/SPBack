@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
-import HeadcountStatus from "../components/HeadcountStatus.vue";
+import HeadcountStatusMFG from "../components/HeadcountStatusMFG.vue";
 import RequiredBarChart from "../components/RequiredBarChart.vue";
 import EmployeeRecommendations from "../components/EmployeeRecommendations.vue";
 import EmployeeSkillTable from "../components/EmployeeSkillTable.vue";
@@ -13,8 +13,8 @@ import WeeklyAbsentTrend from "../components/WeeklyAbsentTrend.vue";
 import MonthlyWorkedTimeOverload from "../components/MonthlyWorkedTimeOverload.vue";
 import WeeklyOvertime from "../components/WeeklyOvertime.vue";
 import HeadcountPlan from "../components/HeadcountPlan.vue";
-import EmployeeGateEntry from "../components/EmployeeGateEntry.vue";
-import StatusTab from "@/components/StatusTab.vue";
+import EmployeeHeadcountMFG from "../components/EmployeeHeadcountMFG.vue";
+import StatusTabMFG from "@/components/StatusTabMFG.vue";
 
 const employees = ref([]);
 const selectedStatus = ref(null);
@@ -80,9 +80,13 @@ const selectEmployee = (employee) => {
 <template>
   <div class="DashboardMFG">
     <header class="header">
-      <a href="http://localhost:8080/" class="logo">
-        <img src="logo2.png" alt="Sony Logo" class="logo" />
-      </a>
+      <div class="logo-title">
+  <a href="http://localhost:8080/" class="logo">
+    <img src="logo2.png" alt="Sony Logo" />
+  </a>
+  <h1>Real time monitoring dashboard for leader allocation</h1>
+  <h1 style="color: red;">For MFG</h1>
+</div>
       <div class="filters">
         <select v-model="filters.division">
           <option value="ALL">Division : ALL</option>
@@ -109,15 +113,15 @@ const selectEmployee = (employee) => {
     </header>
 
     <section class="stats">
-      <StatusTab :filters="filters" />
+      <StatusTabMFG :filters="filters" />
     </section>
 
     <section class="charts">
       <div class="chart">
-        <HeadcountStatus :filters="filters" @filter-status="filterEmployeesByStatus" />
+        <HeadcountStatusMFG :filters="filters" @filter-status="filterEmployeesByStatus" />
       </div>
       <div class="table">
-        <EmployeeGateEntry
+        <EmployeeHeadcountMFG
           :employees="filteredEmployees"
           :filterStatus="selectedStatus"
           :filters="filters"
@@ -207,6 +211,22 @@ const selectEmployee = (employee) => {
   border-radius: 0 0 8px 8px;
 }
 
+.logo-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.logo-title .logo img {
+  width: 120px;
+  height: auto;
+}
+.logo-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
 .logo {
   width: 150px;
 }
@@ -220,8 +240,10 @@ const selectEmployee = (employee) => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 5px;
-  min-width: 600px;
+  padding: 10px 20px;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
 }
 
 .filters select,

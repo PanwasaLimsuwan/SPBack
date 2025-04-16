@@ -3,8 +3,7 @@
     <div class="chart-selector">
       <select v-model="selectedGroup" @change="drawChart">
         <option value="biz">Head Count by Biz</option>
-        <option value="division">Head Count by Division</option>
-        <option value="workGroup">Head Count by WorkGroup</option>
+        <option value="process">Head Count by Process</option> <!-- Changed to 'process' -->
       </select>
     </div>
     <div id="headcount-chart"></div>

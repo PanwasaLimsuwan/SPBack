@@ -2,18 +2,18 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 
-import HeadcountStatus from "../components/HeadcountStatus.vue";
+import HeadcountStatusHR from "../components/HeadcountStatusHR.vue";
 import EmployeeSkillTable from "../components/EmployeeSkillTable.vue";
 import EmployeeSkillSection from "../components/EmployeeSkillSection.vue";
 import fullySkilledPieChart from "../components/fullySkilledPieChart.vue";
-import EmployeeGateEntry from "../components/EmployeeGateEntry.vue";
-import StatusTab from "@/components/StatusTab.vue";
 import HeadcountTransition from "../components/HeadcountTransition.vue";
 import MonthlyOvertime from "../components/MonthlyOvertime.vue";
 import MonthlyAbsentTrend from "./../components/MonthlyAbsentTrend.vue";
 import HeadcountEmployee from "./../components/HeadcountEmployee.vue";
 import EmployeeHeadcount from "./../components/EmployeeHeadcount.vue";
 import TrainingEmployee from './../components/TrainingEmployee.vue';
+import EmployeeHeadcountHR from '@/components/EmployeeHeadcountHR.vue';
+import StatusTabHR from '@/components/StatusTabHR.vue';
 
 // ✅ ตัวแปรหลัก
 const employees = ref([]);
@@ -90,9 +90,13 @@ const selectEmployee = (employee) => {
 <template>
   <div class="DashboardMFG">
     <header class="header">
-      <a href="http://localhost:8080/" class="logo">
-        <img src="logo2.png" alt="Sony Logo" class="logo" />
-      </a>
+      <div class="logo-title">
+  <a href="http://localhost:8080/" class="logo">
+    <img src="logo2.png" alt="Sony Logo" />
+  </a>
+  <h1>Real time monitoring dashboard for leader allocation</h1>
+  <h1 style="color: red;">For HR</h1>
+</div>
       <div class="filters">
         <select v-model="filters.division">
           <option value="ALL">Division : ALL</option>
@@ -119,15 +123,15 @@ const selectEmployee = (employee) => {
     </header>
 
     <section class="stats">
-      <StatusTab :filters="filters" />
+      <StatusTabHR :filters="filters" />
     </section>
 
     <section class="charts">
       <div class="chart">
-        <HeadcountStatus :filters="filters" @filter-status="filterEmployeesByStatus" />
+        <HeadcountStatusHR :filters="filters" @filter-status="filterEmployeesByStatus" />
       </div>
       <div class="table">
-        <EmployeeGateEntry
+        <EmployeeHeadcountHR
           :employees="filteredEmployees"
           :filterStatus="selectedStatus"
           :filters="filters"
@@ -180,7 +184,7 @@ const selectEmployee = (employee) => {
         <HeadcountTransition :filters="filters" />
       </div>
       <div class="chart">
-        <TrainingEmployee />
+        <TrainingEmployee :filters="filters" />
       </div>
     </section>
 

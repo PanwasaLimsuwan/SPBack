@@ -44,40 +44,38 @@ watch(
   <div class="employee-table">
     <div v-if="isLoading" class="loading">Loading employee data...</div>
     <div v-else class="table-scroll">
-    <h3>Head Count</h3>
-    <button class="refresh-skill-btn" @click="resetFilter" title="รีเซตฟิลเตอร์">
-      <img src="refresh.png" alt="Refresh Icon" class="icon" />
-      <span>Refresh</span>
-    </button>
-    <table>
-      <thead>
-        <tr>
-          <th>EmpID</th>
-          <th>Firstname</th>
-          <th>Lastname</th>
-          <th>Section</th>
-          <th>Position</th>
-          <th>ShiftCode</th>
-          <th>Biz</th>
-          <th>Division</th>
-          <th>WorkGroup</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(employee, index) in filteredEmployees" :key="index">
-          <td>{{ employee.empID }}</td>
-          <td>{{ employee.firstName }}</td>
-          <td>{{ employee.lastName }}</td>
-          <td>{{ employee.section }}</td>
-          <td>{{ employee.position }}</td>
-          <td>{{ employee.shiftCode }}</td>
-          <td>{{ employee.biz }}</td>
-          <td>{{ employee.division }}</td>
-          <td>{{ employee.workGroup }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+      <h3>Head Count</h3>
+      <button class="refresh-skill-btn" @click="resetFilter" title="รีเซตฟิลเตอร์">
+        <img src="refresh.png" alt="Refresh Icon" class="icon" />
+        <span>Refresh</span>
+      </button>
+      <table>
+        <thead>
+          <tr>
+            <th>EmpID</th>
+            <th>Firstname</th>
+            <th>Lastname</th>
+            <th>Section</th>
+            <th>Position</th>
+            <th>ShiftCode</th>
+            <th>Biz</th>
+            <th>Process</th> <!-- Changed Division to Process -->
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(employee, index) in filteredEmployees" :key="index">
+            <td>{{ employee.empID }}</td>
+            <td>{{ employee.firstName }}</td>
+            <td>{{ employee.lastName }}</td>
+            <td>{{ employee.section }}</td>
+            <td>{{ employee.position }}</td>
+            <td>{{ employee.shiftCode }}</td>
+            <td>{{ employee.biz }}</td>
+            <td>{{ employee.process }}</td> <!-- Updated to reflect 'process' field -->
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 

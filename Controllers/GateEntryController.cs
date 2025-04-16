@@ -1,6 +1,6 @@
+using System.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using System.Data;
 
 namespace Api.Controllers
 {
@@ -27,7 +27,11 @@ namespace Api.Controllers
         {
             var result = new List<object>();
 
-            using (var conn = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            using (
+                var conn = new SqlConnection(
+                    _configuration.GetConnectionString("DefaultConnection")
+                )
+            )
             {
                 await conn.OpenAsync();
 
@@ -39,7 +43,10 @@ namespace Api.Controllers
                 }
                 else
                 {
-                    var latestDateCmd = new SqlCommand("SELECT TOP 1 EntryDateTime FROM GateEntry WHERE EntryDateTime IS NOT NULL ORDER BY EntryDateTime DESC", conn);
+                    var latestDateCmd = new SqlCommand(
+                        "SELECT TOP 1 EntryDateTime FROM GateEntry WHERE EntryDateTime IS NOT NULL ORDER BY EntryDateTime DESC",
+                        conn
+                    );
                     var latestDateObj = await latestDateCmd.ExecuteScalarAsync();
 
                     if (latestDateObj == null || latestDateObj == DBNull.Value)
@@ -51,9 +58,11 @@ namespace Api.Controllers
                 }
 
                 DateTime dateStart = selectedDate.Date;
-                DateTime dateEnd = selectedDate.Date.AddDays(1).AddSeconds(-1);
+                // DateTime dateEnd = selectedDate.Date.AddDays(1).AddSeconds(-1);
+                DateTime dateEnd = selectedDate.Date.AddDays(1).AddHours(7).AddSeconds(-1); // ครอบคลุมเวลาออกกะ 07:00 ของวันถัดไป
 
-                var query = @"
+                var query =
+                    @"
                     WITH RankedGateEntry AS (
                         SELECT 
                             g.EmpID,
@@ -99,13 +108,31 @@ namespace Api.Controllers
                         while (await reader.ReadAsync())
                         {
                             var empID = Convert.ToInt32(reader["EmpID"]);
-                            var gateStatus = reader["GateStatus"] == DBNull.Value ? null : reader["GateStatus"]?.ToString();
-                            var cStatus = reader["CStatus"] == DBNull.Value ? null : reader["CStatus"]?.ToString();
+                            var gateStatus =
+                                reader["GateStatus"] == DBNull.Value
+                                    ? null
+                                    : reader["GateStatus"]?.ToString();
+                            var cStatus =
+                                reader["CStatus"] == DBNull.Value
+                                    ? null
+                                    : reader["CStatus"]?.ToString();
 
-                            DateTime? entryDateTime = reader["EntryDateTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["EntryDateTime"];
-                            DateTime? exitDateTime = reader["ExitDateTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["ExitDateTime"];
-                            DateTime? checkInDateTime = reader["CheckInDateTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["CheckInDateTime"];
-                            DateTime? checkOutDateTime = reader["CheckOutDateTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["CheckOutDateTime"];
+                            DateTime? entryDateTime =
+                                reader["EntryDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["EntryDateTime"];
+                            DateTime? exitDateTime =
+                                reader["ExitDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["ExitDateTime"];
+                            DateTime? checkInDateTime =
+                                reader["CheckInDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["CheckInDateTime"];
+                            DateTime? checkOutDateTime =
+                                reader["CheckOutDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["CheckOutDateTime"];
 
                             if (gateStatus == "IN")
                             {
@@ -126,31 +153,37 @@ namespace Api.Controllers
                                 ("OUT", "IN") => "status-out-cleanroom",
                                 ("IN", "IN") => "status-in-cleanroom",
                                 ("OUT", "OUT") => "status-get-off",
-                                _ => "status-unknown"
+                                _ => "status-unknown",
                             };
 
-                            result.Add(new
-                            {
-                                EmpID = empID,
-                                firstName = reader["FirstName"]?.ToString(),
-                                lastName = reader["LastName"]?.ToString(),
-                                division = reader["Division"]?.ToString(),
-                                department = reader["Department"]?.ToString(),
-                                position = reader["Position"]?.ToString(),
-                                email = reader["Email"]?.ToString(),
-                                shiftCode = reader["ShiftCode"]?.ToString(),
-                                section = reader["Section"]?.ToString(),
-                                entryDateTime = entryDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
-                                exitDateTime = exitDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
-                                gateNo = reader["GateNo"]?.ToString(),
-                                gateStatus,
-                                biz = reader["Biz"]?.ToString(),
-                                process = reader["Process"]?.ToString(),
-                                cStatus,
-                                checkInDateTime = checkInDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
-                                checkOutDateTime = checkOutDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
-                                status
-                            });
+                            result.Add(
+                                new
+                                {
+                                    EmpID = empID,
+                                    firstName = reader["FirstName"]?.ToString(),
+                                    lastName = reader["LastName"]?.ToString(),
+                                    division = reader["Division"]?.ToString(),
+                                    department = reader["Department"]?.ToString(),
+                                    position = reader["Position"]?.ToString(),
+                                    email = reader["Email"]?.ToString(),
+                                    shiftCode = reader["ShiftCode"]?.ToString(),
+                                    section = reader["Section"]?.ToString(),
+                                    entryDateTime = entryDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    exitDateTime = exitDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    gateNo = reader["GateNo"]?.ToString(),
+                                    gateStatus,
+                                    biz = reader["Biz"]?.ToString(),
+                                    process = reader["Process"]?.ToString(),
+                                    cStatus,
+                                    checkInDateTime = checkInDateTime?.ToString(
+                                        "yyyy-MM-dd HH:mm:ss"
+                                    ),
+                                    checkOutDateTime = checkOutDateTime?.ToString(
+                                        "yyyy-MM-dd HH:mm:ss"
+                                    ),
+                                    status,
+                                }
+                            );
                         }
                     }
                 }

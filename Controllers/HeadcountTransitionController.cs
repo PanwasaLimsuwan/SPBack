@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
-using System;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Api.Controllers
 {
@@ -25,7 +25,8 @@ namespace Api.Controllers
             [FromQuery] string? department,
             [FromQuery] string? section,
             [FromQuery] string? biz,
-            [FromQuery] string? process)
+            [FromQuery] string? process
+        )
         {
             var transitions = new List<object>();
 
@@ -33,7 +34,8 @@ namespace Api.Controllers
             {
                 await conn.OpenAsync();
 
-                var query = @"
+                var query =
+                    @"
                     SELECT 
                         ROW_NUMBER() OVER (ORDER BY ht.EmpID) AS Id,
                         ht.DateTime,
@@ -54,28 +56,53 @@ namespace Api.Controllers
 
                 using (var cmd = new SqlCommand(query, conn))
                 {
-                    cmd.Parameters.AddWithValue("@division", string.IsNullOrEmpty(division) || division == "ALL" ? DBNull.Value : division);
-                    cmd.Parameters.AddWithValue("@department", string.IsNullOrEmpty(department) || department == "ALL" ? DBNull.Value : department);
-                    cmd.Parameters.AddWithValue("@section", string.IsNullOrEmpty(section) || section == "ALL" ? DBNull.Value : section);
-                    cmd.Parameters.AddWithValue("@biz", string.IsNullOrEmpty(biz) || biz == "ALL" ? DBNull.Value : biz);
-                    cmd.Parameters.AddWithValue("@process", string.IsNullOrEmpty(process) || process == "ALL" ? DBNull.Value : process);
+                    cmd.Parameters.AddWithValue(
+                        "@division",
+                        string.IsNullOrEmpty(division) || division == "ALL"
+                            ? DBNull.Value
+                            : division
+                    );
+                    cmd.Parameters.AddWithValue(
+                        "@department",
+                        string.IsNullOrEmpty(department) || department == "ALL"
+                            ? DBNull.Value
+                            : department
+                    );
+                    cmd.Parameters.AddWithValue(
+                        "@section",
+                        string.IsNullOrEmpty(section) || section == "ALL" ? DBNull.Value : section
+                    );
+                    cmd.Parameters.AddWithValue(
+                        "@biz",
+                        string.IsNullOrEmpty(biz) || biz == "ALL" ? DBNull.Value : biz
+                    );
+                    cmd.Parameters.AddWithValue(
+                        "@process",
+                        string.IsNullOrEmpty(process) || process == "ALL" ? DBNull.Value : process
+                    );
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            transitions.Add(new
-                            {
-                                id = reader["Id"],
-                                dateTime = reader["DateTime"] == DBNull.Value ? null : ((DateTime)reader["DateTime"]).ToString("yyyy-MM-ddTHH:mm:ss"),
-                                transType = reader["TransType"]?.ToString(),
-                                EmpID = Convert.ToInt32(reader["EmpID"]),
-                                division = reader["Division"]?.ToString(),
-                                department = reader["Department"]?.ToString(),
-                                section = reader["Section"]?.ToString(),
-                                biz = reader["Biz"]?.ToString(),
-                                process = reader["Process"]?.ToString()
-                            });
+                            transitions.Add(
+                                new
+                                {
+                                    id = reader["Id"],
+                                    dateTime = reader["DateTime"] == DBNull.Value
+                                        ? null
+                                        : ((DateTime)reader["DateTime"]).ToString(
+                                            "yyyy-MM-ddTHH:mm:ss"
+                                        ),
+                                    transType = reader["TransType"]?.ToString(),
+                                    EmpID = Convert.ToInt32(reader["EmpID"]),
+                                    division = reader["Division"]?.ToString(),
+                                    department = reader["Department"]?.ToString(),
+                                    section = reader["Section"]?.ToString(),
+                                    biz = reader["Biz"]?.ToString(),
+                                    process = reader["Process"]?.ToString(),
+                                }
+                            );
                         }
                     }
                 }

@@ -35,25 +35,26 @@ namespace Api.Controllers
                 await conn.OpenAsync();
 
                 var query = @"
-                    SELECT 
-                        mp.PlanID,
-                        mp.Date,
-                        mp.ShiftCode,
-                        mp.Shift,
-                        mp.PlannedHeadcount,
-                        mp.ActualHeadcount,
-                        ei.Division,
-                        ei.Department,
-                        ei.Section,
-                        ei.Biz,
-                        ei.Process
-                    FROM ManpowerPlan mp
-                    LEFT JOIN EmployeeInfo ei ON mp.EmpID = ei.EmpID
-                    WHERE (@division IS NULL OR ei.Division = @division)
-                      AND (@department IS NULL OR ei.Department = @department)
-                      AND (@section IS NULL OR ei.Section = @section)
-                      AND (@biz IS NULL OR ei.Biz = @biz)
-                      AND (@process IS NULL OR ei.Process = @process)";
+    SELECT 
+        mp.PlanID,
+        mp.Date,
+        mp.ShiftCode,
+        mp.Shift,
+        mp.PlannedHeadcount,
+        mp.ActualHeadcount,
+        ei.Division,
+        ei.Department,
+        ei.Section,
+        ei.Biz,
+        ei.Process
+    FROM ManpowerPlan mp
+    LEFT JOIN EmployeeInfo ei ON mp.PlanID = ei.PlanID
+    WHERE (@division IS NULL OR ei.Division = @division)
+      AND (@department IS NULL OR ei.Department = @department)
+      AND (@section IS NULL OR ei.Section = @section)
+      AND (@biz IS NULL OR ei.Biz = @biz)
+      AND (@process IS NULL OR ei.Process = @process)";
+
 
                 using (var cmd = new SqlCommand(query, conn))
                 {

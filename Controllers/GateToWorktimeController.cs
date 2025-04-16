@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Api.Controllers
 {
@@ -27,14 +27,24 @@ namespace Api.Controllers
                 {
                     await conn.OpenAsync();
 
-                    var selectCmd = new SqlCommand(@"
+                    var selectCmd = new SqlCommand(
+                        @"
                         SELECT EmpID, EntryDateTime, ExitDateTime
                         FROM GateEntry
-                        WHERE EntryDateTime IS NOT NULL", conn);
+                        WHERE EntryDateTime IS NOT NULL",
+                        conn
+                    );
 
                     var reader = await selectCmd.ExecuteReaderAsync();
 
-                    var worktimeData = new List<(string EmpID, DateTime Date, double WorkedHours, double OTHours, string Status)>();
+                    var worktimeData =
+                        new List<(
+                            string EmpID,
+                            DateTime Date,
+                            double WorkedHours,
+                            double OTHours,
+                            string Status
+                        )>();
 
                     while (await reader.ReadAsync())
                     {
@@ -42,7 +52,8 @@ namespace Api.Controllers
                         var entry = (DateTime)reader["EntryDateTime"];
 
                         var exitValue = reader["ExitDateTime"];
-                        DateTime? exit = exitValue == DBNull.Value ? (DateTime?)null : (DateTime)exitValue;
+                        DateTime? exit =
+                            exitValue == DBNull.Value ? (DateTime?)null : (DateTime)exitValue;
 
                         var workedHours = exit.HasValue ? (exit.Value - entry).TotalHours : 0;
 
@@ -60,8 +71,15 @@ namespace Api.Controllers
                     int updated = 0;
 
                     // ✅ ดึงรายการ CalculatedWorktime ที่มีอยู่แล้ว
-                    var existingRecords = new Dictionary<string, (double WorkedHours, double OTHours, string Status)>();
-                    var existingCmd = new SqlCommand("SELECT EmpID, Date, WorkedHours, OTHours, Status FROM CalculatedWorktime", conn);
+                    var existingRecords =
+                        new Dictionary<
+                            string,
+                            (double WorkedHours, double OTHours, string Status)
+                        >();
+                    var existingCmd = new SqlCommand(
+                        "SELECT EmpID, Date, WorkedHours, OTHours, Status FROM CalculatedWorktime",
+                        conn
+                    );
                     using (var existingReader = await existingCmd.ExecuteReaderAsync())
                     {
                         while (await existingReader.ReadAsync())
@@ -73,7 +91,11 @@ namespace Api.Controllers
                             var otHours = Convert.ToDouble(existingReader["OTHours"]);
                             var status = existingReader["Status"].ToString();
 
-                            existingRecords[$"{empId}_{date:yyyyMMdd}"] = (workedHours, otHours, status);
+                            existingRecords[$"{empId}_{date:yyyyMMdd}"] = (
+                                workedHours,
+                                otHours,
+                                status
+                            );
                         }
                     }
 
@@ -84,9 +106,12 @@ namespace Api.Controllers
 
                         if (!existingRecords.ContainsKey(key))
                         {
-                            var insertCmd = new SqlCommand(@"
+                            var insertCmd = new SqlCommand(
+                                @"
                                 INSERT INTO CalculatedWorktime (EmpID, Date, WorkedHours, OTHours, Status)
-                                VALUES (@EmpID, @Date, @WorkedHours, @OTHours, @Status)", conn);
+                                VALUES (@EmpID, @Date, @WorkedHours, @OTHours, @Status)",
+                                conn
+                            );
 
                             insertCmd.Parameters.AddWithValue("@EmpID", item.EmpID);
                             insertCmd.Parameters.AddWithValue("@Date", item.Date);
@@ -101,14 +126,19 @@ namespace Api.Controllers
                         {
                             var existing = existingRecords[key];
 
-                            if (existing.Status != item.Status || 
-                                Math.Abs(existing.WorkedHours - item.WorkedHours) > 0.01 ||
-                                Math.Abs(existing.OTHours - item.OTHours) > 0.01)
+                            if (
+                                existing.Status != item.Status
+                                || Math.Abs(existing.WorkedHours - item.WorkedHours) > 0.01
+                                || Math.Abs(existing.OTHours - item.OTHours) > 0.01
+                            )
                             {
-                                var updateCmd = new SqlCommand(@"
+                                var updateCmd = new SqlCommand(
+                                    @"
                                     UPDATE CalculatedWorktime
                                     SET WorkedHours = @WorkedHours, OTHours = @OTHours, Status = @Status
-                                    WHERE EmpID = @EmpID AND Date = @Date", conn);
+                                    WHERE EmpID = @EmpID AND Date = @Date",
+                                    conn
+                                );
 
                                 updateCmd.Parameters.AddWithValue("@EmpID", item.EmpID);
                                 updateCmd.Parameters.AddWithValue("@Date", item.Date);
@@ -122,7 +152,9 @@ namespace Api.Controllers
                         }
                     }
 
-                    return Ok($"Worktime inserted: {inserted} records, updated: {updated} records.");
+                    return Ok(
+                        $"Worktime inserted: {inserted} records, updated: {updated} records."
+                    );
                 }
             }
             catch (Exception ex)

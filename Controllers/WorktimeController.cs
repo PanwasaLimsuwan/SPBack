@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Api.Controllers
 {
@@ -19,9 +19,13 @@ namespace Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetWorktime([FromQuery] string division, [FromQuery] string department,
-                                                     [FromQuery] string section, [FromQuery] string biz,
-                                                     [FromQuery] string process)
+        public async Task<IActionResult> GetWorktime(
+            [FromQuery] string division,
+            [FromQuery] string department,
+            [FromQuery] string section,
+            [FromQuery] string biz,
+            [FromQuery] string process
+        )
         {
             var results = new List<object>();
 
@@ -30,7 +34,8 @@ namespace Api.Controllers
                 await conn.OpenAsync();
 
                 // ✅ Query จาก CalculatedWorktime + Join EmployeeInfo
-                var query = @"
+                var query =
+                    @"
                     SELECT 
                         cw.WorktimeID,
                         cw.EmpID,
@@ -75,19 +80,21 @@ namespace Api.Controllers
                     {
                         while (await reader.ReadAsync())
                         {
-                            results.Add(new
-                            {
-                                worktimeID = reader.GetInt32(0),
-                                empID = Convert.ToInt32(reader["EmpID"]),
-                                date = reader.GetDateTime(2),
-                                otHours = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
-                                status = reader["Status"]?.ToString(),
-                                division = reader["Division"]?.ToString(),
-                                department = reader["Department"]?.ToString(),
-                                section = reader["Section"]?.ToString(),
-                                biz = reader["Biz"]?.ToString(),
-                                process = reader["Process"]?.ToString()
-                            });
+                            results.Add(
+                                new
+                                {
+                                    worktimeID = reader.GetInt32(0),
+                                    empID = Convert.ToInt32(reader["EmpID"]),
+                                    date = reader.GetDateTime(2),
+                                    otHours = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                                    status = reader["Status"]?.ToString(),
+                                    division = reader["Division"]?.ToString(),
+                                    department = reader["Department"]?.ToString(),
+                                    section = reader["Section"]?.ToString(),
+                                    biz = reader["Biz"]?.ToString(),
+                                    process = reader["Process"]?.ToString(),
+                                }
+                            );
                         }
                     }
                 }

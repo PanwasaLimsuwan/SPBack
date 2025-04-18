@@ -19,7 +19,6 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // ✅ GET: api/OJTandInspectionSkill (With Join EmployeeInfo)
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? division,
@@ -37,29 +36,29 @@ namespace Api.Controllers
 
                 var query =
                     @"
-            SELECT 
-                o.CourseNo,
-                o.CourseGroup,
-                o.Biz,
-                o.Process,
-                o.CerNo,
-                o.Active,
-                o.SkillGroup,
-                o.EmpID,
-                e.Division,
-                e.Department,
-                e.Section,
-                e.Biz AS EmployeeBiz,
-                e.Process AS EmployeeProcess
-            FROM OJTandInspectionSkill o
-            LEFT JOIN EmployeeInfo e ON o.EmpID = e.EmpID
-            WHERE 1 = 1";
+        SELECT 
+            o.CourseNo,
+            o.CourseGroup,
+            o.Biz,
+            o.Process,
+            o.CerNo,
+            o.Active,
+            o.SkillGroup,
+            o.EmpID,
+            e.Division,
+            e.Department,
+            e.Section,
+            e.Biz AS EmployeeBiz,
+            e.Process AS EmployeeProcess
+        FROM OJTandInspectionSkill o
+        LEFT JOIN EmployeeInfo e ON o.EmpID = e.EmpID
+        WHERE 1 = 1";
 
                 using (var cmd = new SqlCommand())
                 {
                     cmd.Connection = conn;
 
-                    // Build dynamic WHERE clause with parameters
+                    // ปรับกรองค่าใน SQL Query
                     if (!string.IsNullOrEmpty(division))
                     {
                         query += " AND e.Division = @division";
@@ -108,7 +107,6 @@ namespace Api.Controllers
                                         ? null
                                         : (int?)reader["Active"],
                                     skillGroup = reader["SkillGroup"]?.ToString(),
-                                    // EmpID = reader["EmpID"] == DBNull.Value ? null : Convert.ToInt32(reader["EmpID"]),
                                     EmpID = reader["EmpID"] == DBNull.Value
                                         ? (int?)null
                                         : Convert.ToInt32(reader["EmpID"]),

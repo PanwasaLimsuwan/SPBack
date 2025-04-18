@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
 using Api.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Api.Controllers
 {
@@ -21,21 +21,23 @@ namespace Api.Controllers
 
         // ✅ GET: ดึงข้อมูลทั้งหมด (รายสัปดาห์)
         [HttpGet]
-public async Task<IActionResult> GetAll(
-    [FromQuery] string? division,
-    [FromQuery] string? department,
-    [FromQuery] string? section,
-    [FromQuery] string? biz,
-    [FromQuery] string? process,
-    [FromQuery] int? weekID)
-{
-    var results = new List<object>();
+        public async Task<IActionResult> GetAll(
+            [FromQuery] string? division,
+            [FromQuery] string? department,
+            [FromQuery] string? section,
+            [FromQuery] string? biz,
+            [FromQuery] string? process,
+            [FromQuery] int? weekID
+        )
+        {
+            var results = new List<object>();
 
-    using (var conn = new SqlConnection(_connectionString))
-    {
-        await conn.OpenAsync();
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
 
-        var query = @"
+                var query =
+                    @"
             SELECT 
                 eicc.ControlID, eicc.EmpID, eicc.WeekID, eicc.MonthYear,
                 eicc.TotalHours, eicc.DaysWorked, eicc.TotalOT, eicc.Status,
@@ -44,57 +46,65 @@ public async Task<IActionResult> GetAll(
             JOIN EmployeeInfo ei ON eicc.EmpID = ei.EmpID
             WHERE 1=1";
 
-        if (!string.IsNullOrEmpty(division))
-            query += " AND ei.Division = @division";
-        if (!string.IsNullOrEmpty(department))
-            query += " AND ei.Department = @department";
-        if (!string.IsNullOrEmpty(section))
-            query += " AND ei.Section = @section";
-        if (!string.IsNullOrEmpty(biz))
-            query += " AND ei.Biz = @biz";
-        if (!string.IsNullOrEmpty(process))
-            query += " AND ei.Process = @process";
-        if (weekID.HasValue)
-            query += " AND eicc.WeekID = @weekID";
+                if (!string.IsNullOrEmpty(division))
+                    query += " AND ei.Division = @division";
+                if (!string.IsNullOrEmpty(department))
+                    query += " AND ei.Department = @department";
+                if (!string.IsNullOrEmpty(section))
+                    query += " AND ei.Section = @section";
+                if (!string.IsNullOrEmpty(biz))
+                    query += " AND ei.Biz = @biz";
+                if (!string.IsNullOrEmpty(process))
+                    query += " AND ei.Process = @process";
+                if (weekID.HasValue)
+                    query += " AND eicc.WeekID = @weekID";
 
-        using (var cmd = new SqlCommand(query, conn))
-        {
-            cmd.Parameters.AddWithValue("@division", (object?)division ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@department", (object?)department ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@section", (object?)section ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@biz", (object?)biz ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@process", (object?)process ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@weekID", (object?)weekID ?? DBNull.Value);
-
-            using (var reader = await cmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    results.Add(new
+                    cmd.Parameters.AddWithValue("@division", (object?)division ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@department", (object?)department ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@section", (object?)section ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@biz", (object?)biz ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@process", (object?)process ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@weekID", (object?)weekID ?? DBNull.Value);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        controlID = reader.GetInt32(0),
-                        empID = reader.GetInt32(1),
-                        weekID = reader.GetInt32(2),
-                        monthYear = reader["MonthYear"]?.ToString(),
-                        totalHours = reader.IsDBNull(4) ? null : (float?)reader.GetFloat(4),
-                        daysWorked = reader.IsDBNull(5) ? null : (int?)reader.GetInt32(5),
-                        totalOT = reader.IsDBNull(6) ? null : (float?)reader.GetDouble(6),
-                        status = reader["Status"]?.ToString(),
-                        division = reader["Division"]?.ToString(),
-                        department = reader["Department"]?.ToString(),
-                        section = reader["Section"]?.ToString(),
-                        biz = reader["Biz"]?.ToString(),
-                        process = reader["Process"]?.ToString(),
-                        firstName = reader["FirstName"]?.ToString(),
-                        lastName = reader["LastName"]?.ToString()
-                    });
+                        while (await reader.ReadAsync())
+                        {
+                            results.Add(
+                                new
+                                {
+                                    controlID = reader.GetInt32(0),
+                                    empID = reader.GetInt32(1),
+                                    weekID = reader.GetInt32(2),
+                                    monthYear = reader["MonthYear"]?.ToString(),
+                                    totalHours = reader.IsDBNull(4)
+                                        ? null
+                                        : (float?)reader.GetFloat(4),
+                                    daysWorked = reader.IsDBNull(5)
+                                        ? null
+                                        : (int?)reader.GetInt32(5),
+                                    totalOT = reader.IsDBNull(6)
+                                        ? null
+                                        : (float?)reader.GetDouble(6),
+                                    status = reader["Status"]?.ToString(),
+                                    division = reader["Division"]?.ToString(),
+                                    department = reader["Department"]?.ToString(),
+                                    section = reader["Section"]?.ToString(),
+                                    biz = reader["Biz"]?.ToString(),
+                                    process = reader["Process"]?.ToString(),
+                                    firstName = reader["FirstName"]?.ToString(),
+                                    lastName = reader["LastName"]?.ToString(),
+                                }
+                            );
+                        }
+                    }
                 }
             }
-        }
-    }
 
-    return Ok(results);
-}
+            return Ok(results);
+        }
 
         // ✅ GET: Summary รายเดือน (MonthlySummary)
         [HttpGet("MonthlySummary")]
@@ -103,7 +113,8 @@ public async Task<IActionResult> GetAll(
             [FromQuery] string? department,
             [FromQuery] string? section,
             [FromQuery] string? biz,
-            [FromQuery] string? process)
+            [FromQuery] string? process
+        )
         {
             var results = new List<object>();
 
@@ -111,7 +122,8 @@ public async Task<IActionResult> GetAll(
             {
                 await conn.OpenAsync();
 
-                var query = @"
+                var query =
+                    @"
                     SELECT 
                         eicc.MonthYear,
                         SUM(eicc.TotalOT) AS TotalOT,
@@ -132,7 +144,8 @@ public async Task<IActionResult> GetAll(
                 if (!string.IsNullOrEmpty(process))
                     query += " AND ei.Process = @process";
 
-                query += @"
+                query +=
+                    @"
                     GROUP BY eicc.MonthYear
                     ORDER BY eicc.MonthYear";
 
@@ -148,13 +161,19 @@ public async Task<IActionResult> GetAll(
                     {
                         while (await reader.ReadAsync())
                         {
-                            results.Add(new
-                            {
-                                month = reader["MonthYear"].ToString(),
-                                totalOT = reader.IsDBNull(reader.GetOrdinal("TotalOT")) ? 0 : Convert.ToDouble(reader["TotalOT"]),
-                                totalHours = reader.IsDBNull(reader.GetOrdinal("TotalHours")) ? 0 : Convert.ToDouble(reader["TotalHours"]),
-                                employeeCount = Convert.ToInt32(reader["EmployeeCount"])
-                            });
+                            results.Add(
+                                new
+                                {
+                                    month = reader["MonthYear"].ToString(),
+                                    totalOT = reader.IsDBNull(reader.GetOrdinal("TotalOT"))
+                                        ? 0
+                                        : Convert.ToDouble(reader["TotalOT"]),
+                                    totalHours = reader.IsDBNull(reader.GetOrdinal("TotalHours"))
+                                        ? 0
+                                        : Convert.ToDouble(reader["TotalHours"]),
+                                    employeeCount = Convert.ToInt32(reader["EmployeeCount"]),
+                                }
+                            );
                         }
                     }
                 }

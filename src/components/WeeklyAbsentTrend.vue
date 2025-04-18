@@ -117,6 +117,7 @@ const colorMapping = {
   'PK': '#34495E',      // สีน้ำเงินกรมท่า
   'PCL': '#16A085',     // สีเขียวมรกต
   'ELU1': '#2ECC71',    // สีเขียวสด
+  'ELU2': '#F8C471',    // สีทองอ่อน
   'AG': '#8E44AD',      // สีม่วง
   'HTH': '#F1C40F',     // สีทองเหลือง
   'TKA': '#9B59B6',     // สีม่วงอ่อน
@@ -147,7 +148,7 @@ const colors = names.map(name => colorMapping[name] || '#4caf50'); // ถ้า�
     title: `Weekly Absent Trend (Week ${selectedWeek.value})`,
     height: 400,
     xaxis: { title: 'Process', tickangle: -45 },
-    yaxis: { title: 'จำนวนขาด/สาย' },
+    // yaxis: { title: 'จำนวนขาด/สาย' },
     margin: { l: 60, r: 20, t: 50, b: 100 },
     paper_bgcolor: '#fff',
     plot_bgcolor: '#f9f9f9',

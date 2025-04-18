@@ -134,7 +134,7 @@ const updateChart = () => {
   const layout = {
     title: `Weekly Overtime (Week ${selectedWeek.value})`,
     xaxis: { title: 'Process' },
-    yaxis: { title: 'OT Hours', rangemode: 'tozero' },
+    yaxis: { rangemode: 'tozero' },
     paper_bgcolor: '#fff',
     plot_bgcolor: '#f9f9f9',
     height: 400,

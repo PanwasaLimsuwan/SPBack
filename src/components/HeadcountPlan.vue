@@ -65,7 +65,7 @@ const drawChart = () => {
     title: "Headcount vs Plan",
     barmode: "group",
     xaxis: { title: "Date", tickangle: -45 },
-    yaxis: { title: "Headcount" , dtick: 1000},
+    yaxis: { dtick: 1000},
     paper_bgcolor: "#fff",
     plot_bgcolor: "#f9f9f9",
     margin: { l: 60, r: 20, t: 50, b: 60 },

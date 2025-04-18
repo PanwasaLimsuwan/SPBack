@@ -62,7 +62,7 @@ const drawChart = () => {
   }];
 
   const layout = {
-    title: 'Headcount Status Distribution',
+    title: 'Headcount Status',
     height: 500,
     width: 500,
   };

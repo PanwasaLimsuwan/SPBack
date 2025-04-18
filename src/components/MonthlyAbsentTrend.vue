@@ -1,5 +1,5 @@
 <template>
-  <div class="chart-container">
+  <div>
     <div class="filter-bar">
       <!-- ตัวเลือกเดือน -->
       <label for="month-select">Select Month:</label>
@@ -11,7 +11,8 @@
     </div>
 
     <!-- แสดงกราฟ -->
-    <div id="monthly-absent-summary" class="scrollable-chart"></div>
+    <div v-if="hasData" id="monthly-absent-summary" class="scrollable-chart"></div>
+    <div v-else class="no-data">ไม่พบข้อมูล</div>
   </div>
 </template>
 
@@ -20,24 +21,18 @@ import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import Plotly from 'plotly.js';
 
-// ✅ กำหนดค่าตัวกรองเดือน
 const selectedMonth = ref(null);  // เดือนที่เลือก
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// ✅ รับ props filters จาก parent
+const absentSummary = ref([]);
+const hasData = ref(true);
+
+// รับค่าฟิลเตอร์จาก parent (DashboardHR)
 const props = defineProps({
   filters: Object
 });
 
-const absentSummary = ref([]);
-
-// ✅ โหลดข้อมูลเมื่อ component mount
-onMounted(async () => {
-  await fetchAbsentData();
-  drawMonthlyChart();
-});
-
-// ✅ ฟังก์ชันดึงข้อมูลและกรองตามเดือนที่เลือก
+// ฟังก์ชันดึงข้อมูลการขาดงาน
 const fetchAbsentData = async () => {
   try {
     const res = await axios.get('http://localhost:5000/api/Attendance', {
@@ -52,7 +47,7 @@ const fetchAbsentData = async () => {
 
     const allEmployees = res.data || [];
 
-    // ✅ กรองเฉพาะ status-missing
+    // กรองเฉพาะ status-missing
     const dates = allEmployees
       .filter(emp => (emp.status === 'late' || emp.status === 'Missing') && (emp.date || emp.entryDateTime))
       .map(emp => ({
@@ -61,7 +56,7 @@ const fetchAbsentData = async () => {
       }))
       .filter(({ date }) => !isNaN(date.getTime()));
 
-    // ✅ กรองข้อมูลตามเดือนที่เลือก
+    // กรองข้อมูลตามเดือนที่เลือก
     if (selectedMonth.value) {
       absentSummary.value = countByEmployeeAndMonth(dates).filter(item => new Date(item.month).getMonth() + 1 === selectedMonth.value);
     } else {
@@ -74,7 +69,7 @@ const fetchAbsentData = async () => {
   }
 };
 
-// ✅ รวมจำนวนการขาดงานตามพนักงานและเดือน
+// รวมจำนวนการขาดงานตามพนักงานและเดือน
 const countByEmployeeAndMonth = (dateList) => {
   const counts = {};
 
@@ -94,14 +89,14 @@ const countByEmployeeAndMonth = (dateList) => {
   });
 };
 
-// ✅ แปลงรูปแบบเดือน
+// แปลงรูปแบบเดือน
 const formatMonth = (monthStr) => {
   const [year, month] = monthStr.split('-');
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[parseInt(month) - 1]} ${year}`;
 };
 
-// ✅ วาดกราฟ
+// วาดกราฟ
 const drawMonthlyChart = () => {
   if (!absentSummary.value.length) {
     Plotly.purge('monthly-absent-summary');
@@ -125,14 +120,13 @@ const drawMonthlyChart = () => {
     title: 'Monthly Absent',
     xaxis: {
       title: 'จำนวนวันที่ขาดงาน',
-      dtick: 1, // กำหนดให้มีระยะห่าง
+      dtick: 1,
       automargin: true
     },
     yaxis: {
-      // title: 'Employee and Month',
       automargin: true
     },
-    height: Math.max(400, absentSummary.value.length * 20),  // ปรับความสูงกราฟ
+    height: Math.max(400, absentSummary.value.length * 20),
     paper_bgcolor: '#fff',
     plot_bgcolor: '#f9f9f9',
     margin: { l: 100, r: 20, t: 50, b: 60 },
@@ -140,6 +134,14 @@ const drawMonthlyChart = () => {
 
   Plotly.newPlot('monthly-absent-summary', [trace], layout);
 };
+
+// เรียก fetchAbsentData เมื่อ component mount
+onMounted(fetchAbsentData);
+
+// watch filters เมื่อมีการเปลี่ยนแปลงให้ดึงข้อมูลใหม่
+watch(() => props.filters, () => {
+  fetchAbsentData();
+}, { deep: true });
 </script>
 
 <style scoped>

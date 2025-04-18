@@ -126,7 +126,7 @@ export default {
         const percent = (total / 60) * 100;
 
         let color = "#4caf50"; // Green
-        if (percent >= 90) color = "#f44336"; // Red
+        if (percent >= 100) color = "#f44336"; // Red
         else if (percent >= 80) color = "#ffc107"; // Yellow
 
         return { name, percent, color };

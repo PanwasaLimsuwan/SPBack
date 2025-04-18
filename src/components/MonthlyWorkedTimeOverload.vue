@@ -82,7 +82,7 @@ const drawChart = () => {
   const layout = {
     title: 'Monthly Overload (Over 240 Hours)',
     xaxis: { title: 'Month' },
-    yaxis: { title: 'Total Overload Hours' },
+    // yaxis: { title: 'Total Overload Hours' },
     margin: { l: 60, r: 30, t: 50, b: 60 },
     plot_bgcolor: '#f9f9f9',
     paper_bgcolor: '#fff',

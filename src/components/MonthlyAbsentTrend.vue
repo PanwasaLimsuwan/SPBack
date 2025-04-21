@@ -35,7 +35,7 @@ const props = defineProps({
 // ฟังก์ชันดึงข้อมูลการขาดงาน
 const fetchAbsentData = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/Attendance', {
+    const res = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/Attendance', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -147,7 +147,8 @@ watch(() => props.filters, () => {
 <style scoped>
 #monthly-absent-summary {
   width: 100%;
-  height: 100%;
+  height: 400px; /* หรือสามารถกำหนดขนาดที่ต้องการ */
+  overflow-y: auto; /* ให้ scroll bar แสดงขึ้นเมื่อกราฟเกินพื้นที่ */
 }
 
 .chart-container {

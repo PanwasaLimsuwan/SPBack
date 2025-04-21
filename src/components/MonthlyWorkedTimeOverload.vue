@@ -20,7 +20,7 @@ const overloads = ref([]);
 
 const fetchWorkTimeData = async () => {
   try {
-    const response = await axios.get('http://localhost:5000/api/EICCControl', {
+    const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/EICCControl', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

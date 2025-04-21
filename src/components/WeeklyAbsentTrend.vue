@@ -39,7 +39,7 @@ const getWeekNumber = (date) => {
 
 const fetchAbsentData = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/Attendance', {
+    const res = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/Attendance', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

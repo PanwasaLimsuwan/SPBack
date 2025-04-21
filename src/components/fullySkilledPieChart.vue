@@ -16,7 +16,7 @@ const needTrainingCounts = ref([]);
 // ✅ ฟังก์ชัน fetch data พร้อม filter
 const fetchSkillData = async () => {
   try {
-    const response = await fetch(`http://localhost:5000/api/Skill?division=${props.filters.division !== 'ALL' ? props.filters.division : ''}&department=${props.filters.department !== 'ALL' ? props.filters.department : ''}&section=${props.filters.section !== 'ALL' ? props.filters.section : ''}&biz=${props.filters.biz !== 'ALL' ? props.filters.biz : ''}&process=${props.filters.process !== 'ALL' ? props.filters.process : ''}`);
+    const response = await fetch(`https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/Skill?division=${props.filters.division !== 'ALL' ? props.filters.division : ''}&department=${props.filters.department !== 'ALL' ? props.filters.department : ''}&section=${props.filters.section !== 'ALL' ? props.filters.section : ''}&biz=${props.filters.biz !== 'ALL' ? props.filters.biz : ''}&process=${props.filters.process !== 'ALL' ? props.filters.process : ''}`);
     const data = await response.json();
 
     const skillCategories = {

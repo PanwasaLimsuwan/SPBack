@@ -15,7 +15,7 @@ const isLoading = ref(false);
 const fetchHeadcountData = async () => {
   isLoading.value = true;
   try {
-    const response = await axios.get('http://localhost:5000/api/Attendance/ByDate', {
+    const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/Attendance/ByDate', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -63,7 +63,7 @@ const drawChart = () => {
   }];
 
   const layout = {
-    title: 'Headcount Status Distribution',
+    title: 'Headcount Status',
     height: 500,
     width: 500,
   };

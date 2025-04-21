@@ -25,7 +25,7 @@ watch(selectedGroup, drawChart);
 
 async function fetchData() {
   try {
-    const res = await axios.get('http://localhost:5000/api/GateEntry');
+    const res = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateEntry');
     employees.value = res.data;
     drawChart();
   } catch (err) {

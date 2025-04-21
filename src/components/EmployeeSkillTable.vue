@@ -65,7 +65,7 @@ const filteredEmployees = computed(() => {
 // ✅ ฟังก์ชันโหลดข้อมูลจาก API พร้อม filters
 const fetchEmployeeSkills = async () => {
   try {
-    const response = await axios.get("http://localhost:5000/api/Skill", {
+    const response = await axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/Skill", {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

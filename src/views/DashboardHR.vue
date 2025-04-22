@@ -31,7 +31,7 @@ const filters = ref({
   section: "ALL",
   biz: "ALL",
   process: "ALL",
-  search: "",
+  // search: "",
 });
 
 // ✅ Dynamic dropdown options
@@ -78,20 +78,20 @@ const filteredEmployeesComputed = computed(() => {
       filters.value.biz === "ALL" || emp.biz === filters.value.biz;
     const matchProcess =
       filters.value.process === "ALL" || emp.process === filters.value.process;
-    const matchSearch =
-      filters.value.search === "" ||
-      emp.firstName
-        ?.toLowerCase()
-        .includes(filters.value.search.toLowerCase()) ||
-      emp.lastName?.toLowerCase().includes(filters.value.search.toLowerCase());
+    // const matchSearch =
+    //   filters.value.search === "" ||
+    //   emp.firstName
+    //     ?.toLowerCase()
+    //     .includes(filters.value.search.toLowerCase()) ||
+    //   emp.lastName?.toLowerCase().includes(filters.value.search.toLowerCase());
 
     return (
       matchDivision &&
       matchDepartment &&
       matchSection &&
       matchBiz &&
-      matchProcess &&
-      matchSearch
+      matchProcess 
+      // matchSearch
     );
   });
 });
@@ -126,7 +126,8 @@ const selectEmployee = (employee) => {
   <div class="DashboardMFG">
     <header class="header">
       <div class="logo-title">
-        <a href="http://localhost:8080/" class="logo">
+        <!-- <a href="http://localhost:8080/" class="logo"> -->
+          <a href="https://realtimemotitoringsystem.netlify.app/" class="logo">
           <img src="logo2.png" alt="Sony Logo" />
         </a>
         <h1>Real time monitoring dashboard for leader allocation</h1>
@@ -169,7 +170,6 @@ const selectEmployee = (employee) => {
             {{ process }}
           </option>
         </select>
-        <input type="text" v-model="filters.search" placeholder="Search" />
       </div>
     </header>
 

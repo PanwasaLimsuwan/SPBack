@@ -14,7 +14,8 @@ import MonthlyWorkedTimeOverload from "../components/MonthlyWorkedTimeOverload.v
 import WeeklyOvertime from "../components/WeeklyOvertime.vue";
 import HeadcountPlan from "../components/HeadcountPlan.vue";
 import EmployeeHeadcountMFG from "../components/EmployeeHeadcountMFG.vue";
-import StatusTabMFG from "@/components/StatusTabMFG.vue";
+// import StatusTabMFG from "@/components/StatusTabMFG.vue";
+import StatusTabMFG from "../components/StatusTabMFG.vue";
 
 const employees = ref([]);
 const selectedStatus = ref(null);
@@ -29,7 +30,7 @@ const filters = ref({
   section: 'ALL',
   biz: 'ALL',
   process: 'ALL',
-  search: '',
+  // search: '',
 });
 
 // ✅ Dynamic options
@@ -57,9 +58,9 @@ const filteredEmployees = computed(() => {
     const matchSection = filters.value.section === 'ALL' || emp.section === filters.value.section;
     const matchBiz = filters.value.biz === 'ALL' || emp.biz === filters.value.biz;
     const matchProcess = filters.value.process === 'ALL' || emp.process === filters.value.process;
-    const matchSearch = filters.value.search === '' || emp.firstName?.toLowerCase().includes(filters.value.search.toLowerCase()) || emp.lastName?.toLowerCase().includes(filters.value.search.toLowerCase());
+    // const matchSearch = filters.value.search === '' || emp.firstName?.toLowerCase().includes(filters.value.search.toLowerCase()) || emp.lastName?.toLowerCase().includes(filters.value.search.toLowerCase());
 
-    return matchDivision && matchDepartment && matchSection && matchBiz && matchProcess && matchSearch;
+    return matchDivision && matchDepartment && matchSection && matchBiz && matchProcess;
   });
 });
 
@@ -81,7 +82,8 @@ const selectEmployee = (employee) => {
   <div class="DashboardMFG">
     <header class="header">
       <div class="logo-title">
-  <a href="http://localhost:8080/" class="logo">
+  <!-- <a href="http://localhost:8080/" class="logo"> -->
+    <a href="https://realtimemotitoringsystem.netlify.app/" class="logo">
     <img src="logo2.png" alt="Sony Logo" />
   </a>
   <h1>Real time monitoring dashboard for leader allocation</h1>
@@ -108,7 +110,6 @@ const selectEmployee = (employee) => {
           <option value="ALL">Process : ALL</option>
           <option v-for="process in processes" :key="process" :value="process">{{ process }}</option>
         </select>
-        <input type="text" v-model="filters.search" placeholder="Search" />
       </div>
     </header>
 
@@ -136,10 +137,13 @@ const selectEmployee = (employee) => {
       </div>
       <div class="table">
         <EmployeeRecommendations
-          :employees="filteredEmployees"
-          :filters="filters"
-          @selectEmployee="selectEmployee"
-        />
+  :selectedProcess="selectedProcess"
+  :selectedSkill="selectedSkill"
+  :filters="filters"
+  
+  @selectEmployee="selectEmployee"
+/>
+
       </div>
     </section>
 

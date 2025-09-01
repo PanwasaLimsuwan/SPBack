@@ -43,7 +43,7 @@ const processes = computed(() => [...new Set(employees.value.map(e => e.process)
 // ✅ Fetch Employee Data
 onMounted(async () => {
   try {
-    const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/EmployeeInfo');
+    const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/EmployeeInfo');
     employees.value = response.data;
   } catch (error) {
     console.error('Error fetching employees:', error);

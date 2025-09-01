@@ -65,7 +65,7 @@ const handleBarClick = (event) => {
 // ดึงข้อมูล
 const fetchData = async () => {
   try {
-    const res = await axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/ManpowerReq", {
+    const res = await axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/ManpowerReq", {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

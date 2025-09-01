@@ -47,7 +47,7 @@ export default {
   methods: {
     async fetchGateEntryData() {
       try {
-        const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateEntry', {
+        const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/GateEntry', {
           params: {
             division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
             department: this.filters.department !== 'ALL' ? this.filters.department : undefined,

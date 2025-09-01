@@ -15,7 +15,9 @@ const isLoading = ref(false);
 const fetchEmployees = async () => {
   isLoading.value = true;
   try {
-    const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateEntry', {
+    // ดึงข้อมูลจาก GateEntry
+    // const gateEntryResponse = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/GateEntry', {
+    const gateEntryResponse = await axios.get('https://databasemanpowerdb-cpbbfhaca3fchbgr.southeastasia-01.azurewebsites.net/api/GateEntry', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -24,13 +26,42 @@ const fetchEmployees = async () => {
         process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
       },
     });
-    employees.value = response.data;
+    
+    // ดึงข้อมูลจาก Attendance
+    const attendanceResponse = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/Attendance/ByDate', {
+      params: {
+        division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
+        department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
+        section: props.filters.section !== 'ALL' ? props.filters.section : undefined,
+        biz: props.filters.biz !== 'ALL' ? props.filters.biz : undefined,
+        process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
+      },
+    });
+    
+    // แสดงผลจาก GateEntry
+    const gateEntryData = gateEntryResponse.data;
+    const attendanceData = attendanceResponse.data;
+
+    // กรองพนักงานที่มีสถานะ "Missing" จาก Attendance
+    const missingEmployeeIDs = new Set(attendanceData.filter(att => att.status === 'Missing').map(att => att.empID));
+
+    // แสดงผลพนักงานทั้งหมดจาก GateEntry และกำหนดสถานะ "Missing" สำหรับพนักงานที่มีสถานะ "Missing"
+    // employees.value = gateEntryData.map(entry => {
+    //   if (missingEmployeeIDs.has(entry.empID)) {
+    //     entry.status = 'status-missing'; // เปลี่ยนสถานะเป็น 'status-missing' สำหรับพนักงานที่มีสถานะ 'Missing'
+    //   }
+    //   return entry;
+    // });
+
+     
+
   } catch (error) {
-    console.error('Error fetching gate entry data:', error);
+    console.error('Error fetching data:', error);
   } finally {
     isLoading.value = false;
   }
 };
+
 
 // ✅ watch filters แล้ว refetch และ reset filterStatus
 watch(() => props.filters, () => {

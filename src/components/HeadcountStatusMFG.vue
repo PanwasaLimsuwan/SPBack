@@ -15,7 +15,7 @@ const isLoading = ref(false);
 const fetchHeadcountData = async () => {
   isLoading.value = true;
   try {
-    const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateEntry', {
+    const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/GateEntry', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

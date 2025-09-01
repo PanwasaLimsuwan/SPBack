@@ -164,7 +164,7 @@ const resetSkillFilter = () => {
 const fetchData = async () => {
   try {
     const [req, skillRes, worktimeRes] = await Promise.all([
-      axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/ManpowerReq", {
+      axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/ManpowerReq", {
         params: {
           division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
           department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -173,7 +173,7 @@ const fetchData = async () => {
           process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
         }
       }),
-      axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/Skill", {
+      axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/Skill", {
         params: {
           division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
           department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -182,7 +182,7 @@ const fetchData = async () => {
           process: props.filters.process !== 'ALL' ? props.filters.process : undefined,
         }
       }),
-      axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/EICCControl", {
+      axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/EICCControl", {
         params: {
           division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
           department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

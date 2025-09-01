@@ -19,7 +19,7 @@ const emit = defineEmits(['clear-employee']);
 
 onMounted(async () => {
   try {
-    const response = await axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateEntry");
+    const response = await axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/GateEntry");
     employees.value = response.data;
     filteredEmployees.value = response.data;
   } catch (error) {

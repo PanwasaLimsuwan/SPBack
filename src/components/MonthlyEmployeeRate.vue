@@ -20,7 +20,7 @@ export default {
   methods: {
     async fetchResignationData() {
       try {
-        const response = await axios.get("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/HeadcountTransition");
+        const response = await axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/HeadcountTransition");
         // คัดกรองเฉพาะพนักงานที่ลาออก (transType === "Resign")
         this.resignationData = response.data.filter(entry => entry.transType === "Resign");
       } catch (error) {

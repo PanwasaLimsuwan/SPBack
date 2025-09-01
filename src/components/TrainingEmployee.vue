@@ -18,7 +18,7 @@ onMounted(async () => {
 // ฟังก์ชันดึงข้อมูลจาก API
 const fetchTrainingData = async () => {
   try {
-    const response = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/OJTandInspectionSkill', {
+    const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/OJTandInspectionSkill', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

@@ -43,7 +43,7 @@ const processes = computed(() => [...new Set(employees.value.map(e => e.process)
 // ✅ Fetch Employee Data
 onMounted(async () => {
   try {
-    const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/EmployeeInfo');
+    const response = await axios.get('https://databasemanpowerdb.database.windows.net/api/EmployeeInfo');
     employees.value = response.data;
   } catch (error) {
     console.error('Error fetching employees:', error);
@@ -82,8 +82,8 @@ const selectEmployee = (employee) => {
   <div class="DashboardMFG">
     <header class="header">
       <div class="logo-title">
-  <!-- <a href="http://localhost:8080/" class="logo"> -->
-    <a href="https://realtimemotitoringsystem.netlify.app/" class="logo">
+  <a href="http://localhost:8080/" class="logo">
+    <!-- <a href="https://realtimemotitoringsystem.netlify.app/" class="logo"> -->
     <img src="logo2.png" alt="Sony Logo" />
   </a>
   <h1>Real time monitoring dashboard for leader allocation</h1>

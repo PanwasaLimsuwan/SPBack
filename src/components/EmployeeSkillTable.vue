@@ -65,7 +65,7 @@ const filteredEmployees = computed(() => {
 // ✅ ฟังก์ชันโหลดข้อมูลจาก API พร้อม filters
 const fetchEmployeeSkills = async () => {
   try {
-    const response = await axios.get("https://https://databasemanpowerdb-new.database.windows.net/api/Skill", {
+    const response = await axios.get("https://databasemanpowerdb.database.windows.net/api/Skill", {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

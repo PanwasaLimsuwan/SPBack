@@ -15,7 +15,7 @@ const isLoading = ref(false);
 const fetchEmployees = async () => {
   isLoading.value = true;
   try {
-    const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/Attendance/ByDate', {
+    const response = await axios.get('https://databasemanpowerdb.database.windows.net/api/Attendance/ByDate', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

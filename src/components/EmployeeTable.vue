@@ -55,7 +55,7 @@ export default {
   methods: {
     async fetchEmployees() {
       try {
-        const response = await axios.get("https://https://databasemanpowerdb-new.database.windows.net/EmployeeInfo"); // ดึงข้อมูลพนักงานจาก API
+        const response = await axios.get("https://databasemanpowerdb.database.windows.net/EmployeeInfo"); // ดึงข้อมูลพนักงานจาก API
         this.employees = response.data; // กำหนดข้อมูลพนักงาน
       } catch (error) {
         console.error("Error fetching employee data:", error);

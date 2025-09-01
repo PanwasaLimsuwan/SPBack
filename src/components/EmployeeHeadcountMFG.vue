@@ -16,7 +16,7 @@ const fetchEmployees = async () => {
   isLoading.value = true;
   try {
     // ดึงข้อมูลจาก GateEntry
-    // const gateEntryResponse = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/GateEntry', {
+    // const gateEntryResponse = await axios.get('https://databasemanpowerdb.database.windows.net/api/GateEntry', {
     const gateEntryResponse = await axios.get('https://databasemanpowerdb-cpbbfhaca3fchbgr.southeastasia-01.azurewebsites.net/api/GateEntry', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
@@ -28,7 +28,7 @@ const fetchEmployees = async () => {
     });
     
     // ดึงข้อมูลจาก Attendance
-    const attendanceResponse = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/Attendance/ByDate', {
+    const attendanceResponse = await axios.get('https://databasemanpowerdb.database.windows.net/api/Attendance/ByDate', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

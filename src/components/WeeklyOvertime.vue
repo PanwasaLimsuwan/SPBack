@@ -64,7 +64,7 @@ const colorMapping = {
 // ✅ Fetch ข้อมูลหลัก
 const fetchWorkTimeData = async () => {
   try {
-    const response = await axios.get('https://https://databasemanpowerdb-new.database.windows.net/api/EICCControl', {
+    const response = await axios.get('https://databasemanpowerdb.database.windows.net/api/EICCControl', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\This\\OneDrive\\Desktop\\special project\\2024\\backend\\Api\\Api.csproj": {}
+    "C:\\Code\\special project\\2024\\backend\\api\\Api.csproj": {}
   },
   "projects": {
-    "C:\\Users\\This\\OneDrive\\Desktop\\special project\\2024\\backend\\Api\\Api.csproj": {
+    "C:\\Code\\special project\\2024\\backend\\api\\Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\This\\OneDrive\\Desktop\\special project\\2024\\backend\\Api\\Api.csproj",
+        "projectUniqueName": "C:\\Code\\special project\\2024\\backend\\api\\Api.csproj",
         "projectName": "Api",
-        "projectPath": "C:\\Users\\This\\OneDrive\\Desktop\\special project\\2024\\backend\\Api\\Api.csproj",
-        "packagesPath": "C:\\Users\\This\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\This\\OneDrive\\Desktop\\special project\\2024\\backend\\Api\\obj\\",
+        "projectPath": "C:\\Code\\special project\\2024\\backend\\api\\Api.csproj",
+        "packagesPath": "C:\\Users\\Kitti\\.nuget\\packages\\",
+        "outputPath": "C:\\Code\\special project\\2024\\backend\\api\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\This\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Kitti\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -43,9 +43,25 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.0.3, )"
+            },
+            "Dapper": {
+              "target": "Package",
+              "version": "[2.1.24, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            },
             "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[8.0.0, )"
+            },
+            "Microsoft.Data.SqlClient": {
+              "target": "Package",
+              "version": "[5.2.0, )"
             },
             "Microsoft.EntityFrameworkCore.Design": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
@@ -95,7 +111,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.407/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.415/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Api.Models;
+using Api.Jobs;
+// using Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,8 +30,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient(); // สำหรับ BackgroundService ใช้เรียก API
 // builder.Services.AddHostedService<GateToWorktimeJob>(); // ลงทะเบียน background job
-// builder.Services.AddHostedService<CalculatedOTJob>();
-
+builder.Services.AddHostedService<CalculatedWorktimeJob>();
+builder.Services.AddHostedService<CalculatedOTJob>();
+builder.Services.AddHostedService<Api.Services.CalculatedAttendanceJob>();
+// builder.Services.AddHostedService<CalculatedAttendanceJob>();
+builder.Services.AddSingleton<AnalyticsRepository>();
+builder.Services.AddScoped<AnalyticsRepository>(); // 👈 เพิ่มบรรทัดนี้
 
 var app = builder.Build();
 

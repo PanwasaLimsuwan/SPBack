@@ -1,10 +1,6 @@
+using System.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Threading.Tasks;
-using Api.Models;
+using Microsoft.Data.SqlClient;
 
 namespace Api.Controllers
 {
@@ -19,168 +15,237 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllAttendance()
+        // [HttpGet("ByDate")] ที่ดึงข้อมูลตามวันที่
+        [HttpGet("ByDate")]
+        public async Task<IActionResult> GetAllAttendanceByDate(
+            [FromQuery] DateTime? date,
+            [FromQuery] string? division,
+            [FromQuery] string? department,
+            [FromQuery] string? section,
+            [FromQuery] string? biz,
+            [FromQuery] string? process
+        )
         {
-            var result = new List<Attendance>();
+            var result = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var query = "SELECT * FROM Attendance";
 
-                using (var cmd = new SqlCommand(query, conn))
+                DateTime selectedDate;
+
+                if (date.HasValue)
+                {
+                    selectedDate = date.Value;
+                }
+                else
+                {
+                    var latestDateCmd = new SqlCommand(
+                        "SELECT TOP 1 EntryDateTime FROM GateEntry WHERE EntryDateTime IS NOT NULL ORDER BY EntryDateTime DESC",
+                        conn
+                    );
+                    var latestDateObj = await latestDateCmd.ExecuteScalarAsync();
+
+                    if (latestDateObj == null || latestDateObj == DBNull.Value)
+                    {
+                        return Ok(result);
+                    }
+
+                    selectedDate = ((DateTime)latestDateObj).Date;
+                }
+
+                DateTime dateStart = selectedDate.Date;
+                DateTime dateEnd = selectedDate.Date.AddDays(1).AddHours(7).AddSeconds(-1);
+
+                var query =
+                    @"
+                    SELECT 
+                        a.AttendanceID, a.EmpID, a.Date, a.CheckInTime, a.CheckOutTime, a.Status,
+                        e.Division, e.Department, e.Section, e.Biz, e.Process, e.FirstName, e.LastName
+                    FROM Attendance a
+                    JOIN EmployeeInfo e ON a.EmpID = e.EmpID
+                    WHERE a.Date BETWEEN @dateStart AND @dateEnd
+                ";
+
+                var cmd = new SqlCommand();
+                cmd.Connection = conn;
+                cmd.Parameters.AddWithValue("@dateStart", dateStart);
+                cmd.Parameters.AddWithValue("@dateEnd", dateEnd);
+
+                if (!string.IsNullOrEmpty(division))
+                {
+                    query += " AND e.Division = @division";
+                    cmd.Parameters.AddWithValue("@division", division);
+                }
+
+                if (!string.IsNullOrEmpty(department))
+                {
+                    query += " AND e.Department = @department";
+                    cmd.Parameters.AddWithValue("@department", department);
+                }
+
+                if (!string.IsNullOrEmpty(section))
+                {
+                    query += " AND e.Section = @section";
+                    cmd.Parameters.AddWithValue("@section", section);
+                }
+
+                if (!string.IsNullOrEmpty(biz))
+                {
+                    query += " AND e.Biz = @biz";
+                    cmd.Parameters.AddWithValue("@biz", biz);
+                }
+
+                if (!string.IsNullOrEmpty(process))
+                {
+                    query += " AND e.Process = @process";
+                    cmd.Parameters.AddWithValue("@process", process);
+                }
+
+                query += " ORDER BY CAST(a.Date AS DATE)";
+                cmd.CommandText = query;
+                cmd.CommandTimeout = 300;
+
                 using (var reader = await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
-                        result.Add(new Attendance
-                        {
-                            AttendanceID = Convert.ToInt32(reader["AttendanceID"]),
-                            EmpID = reader["EmpID"].ToString(),
-                            Date = reader["Date"] as DateTime?,
-                            CheckInTime = reader["CheckInTime"] as TimeSpan?,
-                            CheckOutTime = reader["CheckOutTime"] as TimeSpan?,
-                            ScheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
-                            ScheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
-                            Status = reader["Status"]?.ToString(),
-                            WeekNumber = reader["WeekNumber"] as int?
-                        });
-                    }
-                }
-            }
-
-            // return Ok(result);
-            return Success(data); // ใช้ LibResponseController
-        }
-
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetAttendanceById(int id)
-        {
-            Attendance attendance = null;
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var query = "SELECT * FROM Attendance WHERE AttendanceID = @id";
-                using (var cmd = new SqlCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", id);
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            attendance = new Attendance
+                        result.Add(
+                            new
                             {
-                                AttendanceID = Convert.ToInt32(reader["AttendanceID"]),
-                                EmpID = reader["EmpID"].ToString(),
-                                Date = reader["Date"] as DateTime?,
-                                CheckInTime = reader["CheckInTime"] as TimeSpan?,
-                                CheckOutTime = reader["CheckOutTime"] as TimeSpan?,
-                                ScheduledStartTime = reader["ScheduledStartTime"] as TimeSpan?,
-                                ScheduledEndTime = reader["ScheduledEndTime"] as TimeSpan?,
-                                Status = reader["Status"]?.ToString(),
-                                WeekNumber = reader["WeekNumber"] as int?
-                            };
-                        }
+                                attendanceID = reader.GetInt32(0),
+                                empID = reader.GetInt32(1),
+                                date = reader.IsDBNull(2)
+                                    ? null
+                                    : reader.GetDateTime(2).ToString("yyyy-MM-dd"),
+                                checkInTime = reader.IsDBNull(3)
+                                    ? (TimeSpan?)null
+                                    : reader.GetTimeSpan(3),
+                                checkOutTime = reader.IsDBNull(4)
+                                    ? (TimeSpan?)null
+                                    : reader.GetTimeSpan(4),
+                                status = reader.IsDBNull(5) ? null : reader.GetString(5),
+                                division = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                department = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                section = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                biz = reader.IsDBNull(9) ? null : reader.GetString(9),
+                                process = reader.IsDBNull(10) ? null : reader.GetString(10),
+                                firstName = reader.GetString(11),
+                                lastName = reader.GetString(12),
+                            }
+                        );
                     }
                 }
             }
 
-            if (attendance == null)
-                return NotFound("Attendance record not found");
-
-            // return Ok(attendance);
-            return Success(data); // ใช้ LibResponseController
+            return Ok(result);
         }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateAttendance([FromBody] Attendance attendance)
+        // [HttpGet] ที่ดึงข้อมูลทั้งหมด
+        [HttpGet]
+        public async Task<IActionResult> GetAllAttendance(
+            [FromQuery] string? division,
+            [FromQuery] string? department,
+            [FromQuery] string? section,
+            [FromQuery] string? biz,
+            [FromQuery] string? process
+        )
         {
+            var result = new List<object>();
+
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var query = @"
-                    INSERT INTO Attendance (EmpID, Date, CheckInTime, CheckOutTime, ScheduledStartTime, ScheduledEndTime, Status, WeekNumber)
-                    VALUES (@EmpID, @Date, @CheckInTime, @CheckOutTime, @ScheduledStartTime, @ScheduledEndTime, @Status, @WeekNumber)";
 
-                using (var cmd = new SqlCommand(query, conn))
+                var query =
+                    @"
+                    SELECT 
+                        a.AttendanceID, 
+                        a.EmpID, 
+                        CAST(a.Date AS DATE) AS Date, 
+                        a.CheckInTime, 
+                        a.CheckOutTime, 
+                        a.Status,
+                        e.Division, 
+                        e.Department, 
+                        e.Section, 
+                        e.Biz, 
+                        e.Process, 
+                        e.FirstName, 
+                        e.LastName
+                    FROM Attendance a
+                    JOIN EmployeeInfo e ON a.EmpID = e.EmpID
+                    WHERE 1 = 1
+                ";
+
+                var cmd = new SqlCommand();
+                cmd.Connection = conn;
+
+                if (!string.IsNullOrEmpty(division))
                 {
-                    cmd.Parameters.AddWithValue("@EmpID", attendance.EmpID);
-                    cmd.Parameters.AddWithValue("@Date", (object?)attendance.Date ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@CheckInTime", (object?)attendance.CheckInTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@CheckOutTime", (object?)attendance.CheckOutTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ScheduledStartTime", (object?)attendance.ScheduledStartTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ScheduledEndTime", (object?)attendance.ScheduledEndTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Status", (object?)attendance.Status ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@WeekNumber", (object?)attendance.WeekNumber ?? DBNull.Value);
+                    query += " AND e.Division = @division";
+                    cmd.Parameters.AddWithValue("@division", division);
+                }
 
-                    await cmd.ExecuteNonQueryAsync();
+                if (!string.IsNullOrEmpty(department))
+                {
+                    query += " AND e.Department = @department";
+                    cmd.Parameters.AddWithValue("@department", department);
+                }
+
+                if (!string.IsNullOrEmpty(section))
+                {
+                    query += " AND e.Section = @section";
+                    cmd.Parameters.AddWithValue("@section", section);
+                }
+
+                if (!string.IsNullOrEmpty(biz))
+                {
+                    query += " AND e.Biz = @biz";
+                    cmd.Parameters.AddWithValue("@biz", biz);
+                }
+
+                if (!string.IsNullOrEmpty(process))
+                {
+                    query += " AND e.Process = @process";
+                    cmd.Parameters.AddWithValue("@process", process);
+                }
+
+                query += " ORDER BY CAST(a.Date AS DATE)";
+                cmd.CommandText = query;
+                cmd.CommandTimeout = 300;
+
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        result.Add(
+                            new
+                            {
+                                attendanceID = reader.GetInt32(0),
+                                empID = reader.GetInt32(1),
+                                date = reader.GetDateTime(2).ToString("yyyy-MM-dd"),
+                                checkInTime = reader.IsDBNull(3)
+                                    ? (TimeSpan?)null
+                                    : reader.GetTimeSpan(3),
+                                checkOutTime = reader.IsDBNull(4)
+                                    ? (TimeSpan?)null
+                                    : reader.GetTimeSpan(4),
+                                status = reader.IsDBNull(5) ? null : reader.GetString(5),
+                                division = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                department = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                section = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                biz = reader.IsDBNull(9) ? null : reader.GetString(9),
+                                process = reader.IsDBNull(10) ? null : reader.GetString(10),
+                                firstName = reader.GetString(11),
+                                lastName = reader.GetString(12),
+                            }
+                        );
+                    }
                 }
             }
 
-            // return Ok("Attendance record created successfully");
-            return Success(data); // ใช้ LibResponseController
-        }
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateAttendance(int id, [FromBody] Attendance attendance)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var query = @"
-                    UPDATE Attendance SET 
-                        EmpID = @EmpID,
-                        Date = @Date,
-                        CheckInTime = @CheckInTime,
-                        CheckOutTime = @CheckOutTime,
-                        ScheduledStartTime = @ScheduledStartTime,
-                        ScheduledEndTime = @ScheduledEndTime,
-                        Status = @Status,
-                        WeekNumber = @WeekNumber
-                    WHERE AttendanceID = @id";
-
-                using (var cmd = new SqlCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", id);
-                    cmd.Parameters.AddWithValue("@EmpID", attendance.EmpID);
-                    cmd.Parameters.AddWithValue("@Date", (object?)attendance.Date ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@CheckInTime", (object?)attendance.CheckInTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@CheckOutTime", (object?)attendance.CheckOutTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ScheduledStartTime", (object?)attendance.ScheduledStartTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ScheduledEndTime", (object?)attendance.ScheduledEndTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Status", (object?)attendance.Status ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@WeekNumber", (object?)attendance.WeekNumber ?? DBNull.Value);
-
-                    var affectedRows = await cmd.ExecuteNonQueryAsync();
-                    if (affectedRows == 0) return NotFound("Attendance record not found");
-                }
-            }
-
-            // return Ok("Attendance record updated successfully");
-            return Success(data); // ใช้ LibResponseController
-        }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteAttendance(int id)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var query = "DELETE FROM Attendance WHERE AttendanceID = @id";
-
-                using (var cmd = new SqlCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", id);
-                    var affectedRows = await cmd.ExecuteNonQueryAsync();
-                    if (affectedRows == 0) return NotFound("Attendance record not found");
-                }
-            }
-
-            // return Ok("Attendance record deleted successfully");
-            return Success(data); // ใช้ LibResponseController
+            return Ok(result);
         }
     }
 }

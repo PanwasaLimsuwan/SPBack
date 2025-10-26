@@ -43,5 +43,13 @@ namespace Api.Models
 
         // DbSet สำหรับการจัดการข้อมูล Skill
         public DbSet<Skill> Skill { get; set; }
+        
+        // DbSet สำหรับการจัดการข้อมูล Assignment
+        public DbSet<Assignment> Assignment { get; set; }
+
+        // DbSet สำหรับการจัดการข้อมูล Admin
+        public DbSet<Admin> Admin { get; set; }
+
+        // public DbSet<Cameras> Cameras { get; set; } // 👈 เพิ่มตรงนี้!
     }
 }

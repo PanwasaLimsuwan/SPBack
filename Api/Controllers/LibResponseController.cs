@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -7,6 +5,9 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+
 // ResponseController version 1.0.2
 namespace API_ProductionQuality.Controllers
 {
@@ -29,20 +30,27 @@ namespace API_ProductionQuality.Controllers
         /// <param name="message">(optional) The message of the response (Example: "Data retrieved successfully.")</param>
         /// <param name="data">(optional) The data in <see cref="JsonResult"/> format.</param>
         /// <returns>The standardised JSON response.</returns>
-        public JsonResult ResponseResult(string status, int code, string message = "", JsonResult data = null)
+        public JsonResult ResponseResult(
+            string status,
+            int code,
+            string message = "",
+            JsonResult data = null
+        )
         {
             if (data == null)
             {
-                return new JsonResult(new
+                return new JsonResult(
+                    new
+                    {
+                        status = status,
+                        code = code,
+                        message = message,
+                        time = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                        data = new { },
+                    }
+                )
                 {
-                    status = status,
-                    code = code,
-                    message = message,
-                    time = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                    data = new { }
-                })
-                {
-                    StatusCode = code
+                    StatusCode = code,
                 };
             }
             else
@@ -50,32 +58,35 @@ namespace API_ProductionQuality.Controllers
                 // แก้กรณี data is a JsonResult
                 if (data is JsonResult jsonResult)
                 {
-                    return new JsonResult(new
+                    return new JsonResult(
+                        new
+                        {
+                            status = status,
+                            code = code,
+                            message = message,
+                            time = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                            data = data.Value,
+                        }
+                    )
                     {
-                        status = status,
-                        code = code,
-                        message = message,
-                        time = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                        data = data.Value
-                    })
-                    {
-                        StatusCode = code
+                        StatusCode = code,
                     };
                 }
                 else
                 {
-                    return new JsonResult(new
+                    return new JsonResult(
+                        new
+                        {
+                            status = status,
+                            code = code,
+                            message = message,
+                            time = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                            data = data,
+                        }
+                    )
                     {
-                        status = status,
-                        code = code,
-                        message = message,
-                        time = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                        data = data
-                    })
-                    {
-                        StatusCode = code
+                        StatusCode = code,
                     };
-
                 }
             }
         }
@@ -88,7 +99,11 @@ namespace API_ProductionQuality.Controllers
         /// </remarks>
         /// <param name="data">(required) The data in <see cref="JsonResult"/> format.</param>
         /// <returns>The standardised JSON response.</returns>
-        public JsonResult Result(JsonResult data, string message = "Data retrieved successfully.", bool isPost = false)
+        public JsonResult Result(
+            JsonResult data,
+            string message = "Data retrieved successfully.",
+            bool isPost = false
+        )
         {
             // Deserialize the JsonResult object to a JsonElement
             var jsonData = JsonSerializer.Serialize(data.Value);
@@ -102,8 +117,10 @@ namespace API_ProductionQuality.Controllers
             else
             {
                 // Check if the JsonElement contains the standardized fields
-                if (dynamicData.TryGetProperty("status", out JsonElement status) &&
-                    dynamicData.TryGetProperty("code", out JsonElement code))
+                if (
+                    dynamicData.TryGetProperty("status", out JsonElement status)
+                    && dynamicData.TryGetProperty("code", out JsonElement code)
+                )
                 {
                     return data;
                 }
@@ -147,8 +164,6 @@ namespace API_ProductionQuality.Controllers
             return ResponseResult("success", 201, "Data updated successfully.", data);
         }
 
-
-
         /// <summary>
         ///     Returns standardised JSON response for a successful request.
         /// </summary>
@@ -171,7 +186,6 @@ namespace API_ProductionQuality.Controllers
         {
             return ResponseResult("success", 200, message);
         }
-
 
         /// <summary>
         ///     Returns standardised JSON response for a created request.
@@ -256,7 +270,6 @@ namespace API_ProductionQuality.Controllers
             return ResponseResult("error", 403, message);
         }
 
-
         /// <summary>
         ///     Returns standardised JSON response for a conflict request.
         /// </summary>
@@ -268,8 +281,5 @@ namespace API_ProductionQuality.Controllers
         {
             return ResponseResult("error", 409, message);
         }
-
-
-
     }
 }

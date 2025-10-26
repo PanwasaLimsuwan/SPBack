@@ -1,0 +1,7 @@
+{
+    "appService.preDeployTask": "publish-release",
+    "appService.deploySubpath": "Api\\bin\\Release\\net8.0\\publish",
+    "appService.defaultWebAppToDeploy": "/subscriptions/7a674e21-ae8b-466d-8c26-5c9d65569e4f/resourceGroups/databasemanpowerdb_group/providers/Microsoft.Web/sites/databasemanpowerdb",
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
+}

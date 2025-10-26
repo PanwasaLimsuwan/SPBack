@@ -19,150 +19,75 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/ManpowerPlan
+        // ✅ GET: api/ManpowerPlan (พร้อม filters)
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] string? division,
+            [FromQuery] string? department,
+            [FromQuery] string? section,
+            [FromQuery] string? biz,
+            [FromQuery] string? process)
         {
-            var plans = new List<ManpowerPlan>();
+            var plans = new List<object>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM ManpowerPlan", conn);
-                var reader = await cmd.ExecuteReaderAsync();
 
-                while (await reader.ReadAsync())
+                var query = @"
+    SELECT 
+        mp.PlanID,
+        mp.Date,
+        mp.ShiftCode,
+        mp.Shift,
+        mp.PlannedHeadcount,
+        mp.ActualHeadcount,
+        ei.Division,
+        ei.Department,
+        ei.Section,
+        ei.Biz,
+        ei.Process
+    FROM ManpowerPlan mp
+    LEFT JOIN EmployeeInfo ei ON mp.PlanID = ei.PlanID
+    WHERE (@division IS NULL OR ei.Division = @division)
+      AND (@department IS NULL OR ei.Department = @department)
+      AND (@section IS NULL OR ei.Section = @section)
+      AND (@biz IS NULL OR ei.Biz = @biz)
+      AND (@process IS NULL OR ei.Process = @process)";
+
+
+                using (var cmd = new SqlCommand(query, conn))
                 {
-                    plans.Add(new ManpowerPlan
+                    cmd.Parameters.AddWithValue("@division", string.IsNullOrEmpty(division) || division == "ALL" ? DBNull.Value : division);
+                    cmd.Parameters.AddWithValue("@department", string.IsNullOrEmpty(department) || department == "ALL" ? DBNull.Value : department);
+                    cmd.Parameters.AddWithValue("@section", string.IsNullOrEmpty(section) || section == "ALL" ? DBNull.Value : section);
+                    cmd.Parameters.AddWithValue("@biz", string.IsNullOrEmpty(biz) || biz == "ALL" ? DBNull.Value : biz);
+                    cmd.Parameters.AddWithValue("@process", string.IsNullOrEmpty(process) || process == "ALL" ? DBNull.Value : process);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        PlanID = reader.GetInt32(0),
-                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                        EmpID = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Attendance = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        ShiftCode = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        Shift = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        PlannedHeadcount = reader.IsDBNull(6) ? null : reader.GetInt32(6),
-                        ActualHeadcount = reader.IsDBNull(7) ? null : reader.GetInt32(7)
-                    });
+                        while (await reader.ReadAsync())
+                        {
+                            plans.Add(new
+                            {
+                                planID = reader["PlanID"],
+                                date = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
+                                shiftCode = reader["ShiftCode"]?.ToString(),
+                                shift = reader["Shift"]?.ToString(),
+                                plannedHeadcount = reader["PlannedHeadcount"] == DBNull.Value ? null : (int?)reader["PlannedHeadcount"],
+                                actualHeadcount = reader["ActualHeadcount"] == DBNull.Value ? null : (int?)reader["ActualHeadcount"],
+                                division = reader["Division"]?.ToString(),
+                                department = reader["Department"]?.ToString(),
+                                section = reader["Section"]?.ToString(),
+                                biz = reader["Biz"]?.ToString(),
+                                process = reader["Process"]?.ToString()
+                            });
+                        }
+                    }
                 }
             }
 
             return Ok(plans);
-        }
-
-        // GET: api/ManpowerPlan/{id}
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            ManpowerPlan plan = null;
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var cmd = new SqlCommand("SELECT * FROM ManpowerPlan WHERE PlanID = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
-
-                var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
-                {
-                    plan = new ManpowerPlan
-                    {
-                        PlanID = reader.GetInt32(0),
-                        Date = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                        EmpID = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Attendance = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        ShiftCode = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        Shift = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        PlannedHeadcount = reader.IsDBNull(6) ? null : reader.GetInt32(6),
-                        ActualHeadcount = reader.IsDBNull(7) ? null : reader.GetInt32(7)
-                    };
-                }
-            }
-
-            if (plan == null)
-                return NotFound();
-
-            return Ok(plan);
-        }
-
-        // POST: api/ManpowerPlan
-        [HttpPost]
-        public async Task<IActionResult> Create([FromBody] ManpowerPlan plan)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var cmd = new SqlCommand(@"
-                    INSERT INTO ManpowerPlan 
-                    (Date, EmpID, Attendance, ShiftCode, Shift, PlannedHeadcount, ActualHeadcount)
-                    VALUES 
-                    (@Date, @EmpID, @Attendance, @ShiftCode, @Shift, @PlannedHeadcount, @ActualHeadcount)", conn);
-
-                cmd.Parameters.AddWithValue("@Date", (object?)plan.Date ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@EmpID", (object?)plan.EmpID ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Attendance", (object?)plan.Attendance ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@ShiftCode", (object?)plan.ShiftCode ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Shift", (object?)plan.Shift ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@PlannedHeadcount", (object?)plan.PlannedHeadcount ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@ActualHeadcount", (object?)plan.ActualHeadcount ?? DBNull.Value);
-
-                await cmd.ExecuteNonQueryAsync();
-            }
-
-            return Ok("Created");
-        }
-
-        // PUT: api/ManpowerPlan/{id}
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] ManpowerPlan plan)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var cmd = new SqlCommand(@"
-                    UPDATE ManpowerPlan SET 
-                        Date = @Date,
-                        EmpID = @EmpID,
-                        Attendance = @Attendance,
-                        ShiftCode = @ShiftCode,
-                        Shift = @Shift,
-                        PlannedHeadcount = @PlannedHeadcount,
-                        ActualHeadcount = @ActualHeadcount
-                    WHERE PlanID = @PlanID", conn);
-
-                cmd.Parameters.AddWithValue("@PlanID", id);
-                cmd.Parameters.AddWithValue("@Date", (object?)plan.Date ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@EmpID", (object?)plan.EmpID ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Attendance", (object?)plan.Attendance ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@ShiftCode", (object?)plan.ShiftCode ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Shift", (object?)plan.Shift ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@PlannedHeadcount", (object?)plan.PlannedHeadcount ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@ActualHeadcount", (object?)plan.ActualHeadcount ?? DBNull.Value);
-
-                var rows = await cmd.ExecuteNonQueryAsync();
-                if (rows == 0)
-                    return NotFound();
-            }
-
-            return NoContent();
-        }
-
-        // DELETE: api/ManpowerPlan/{id}
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-                var cmd = new SqlCommand("DELETE FROM ManpowerPlan WHERE PlanID = @id", conn);
-                cmd.Parameters.AddWithValue("@id", id);
-
-                var rows = await cmd.ExecuteNonQueryAsync();
-                if (rows == 0)
-                    return NotFound();
-            }
-
-            return NoContent();
         }
     }
 }

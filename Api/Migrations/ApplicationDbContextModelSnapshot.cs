@@ -22,6 +22,31 @@ namespace Api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Api.Models.Admin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Admins");
+                });
+
             modelBuilder.Entity("Api.Models.Attendance", b =>
                 {
                     b.Property<int>("AttendanceID")
@@ -42,18 +67,10 @@ namespace Api.Migrations
                     b.Property<int>("EmpID")
                         .HasColumnType("int");
 
-                    b.Property<int>("EmployeeInfoEmpID")
-                        .HasColumnType("int");
-
                     b.Property<string>("Status")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("WeekNumber")
-                        .HasColumnType("int");
-
                     b.HasKey("AttendanceID");
-
-                    b.HasIndex("EmployeeInfoEmpID");
 
                     b.ToTable("Attendance");
                 });
@@ -79,12 +96,7 @@ namespace Api.Migrations
                     b.Property<int>("EmpID")
                         .HasColumnType("int");
 
-                    b.Property<int>("EmployeeInfoEmpID")
-                        .HasColumnType("int");
-
                     b.HasKey("CEntryID");
-
-                    b.HasIndex("EmployeeInfoEmpID");
 
                     b.ToTable("CleanroomEntry");
                 });
@@ -103,27 +115,20 @@ namespace Api.Migrations
                     b.Property<int>("EmpID")
                         .HasColumnType("int");
 
-                    b.Property<int>("EmployeeInfoEmpID")
-                        .HasColumnType("int");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<float?>("TotalHours")
-                        .HasColumnType("real");
+                    b.Property<double?>("TotalHours")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("TotalOT")
+                        .HasColumnType("float");
 
                     b.Property<int>("WeekID")
                         .HasColumnType("int");
 
-                    b.Property<int>("WeeklyScheduleWeekID")
-                        .HasColumnType("int");
-
                     b.HasKey("ControlID");
-
-                    b.HasIndex("EmployeeInfoEmpID");
-
-                    b.HasIndex("WeeklyScheduleWeekID");
 
                     b.ToTable("EICC_Control");
                 });
@@ -136,19 +141,26 @@ namespace Api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmpID"));
 
-                    b.Property<long?>("BossGID")
+                    b.Property<string>("Biz")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("BossGID")
                         .HasColumnType("bigint");
 
-                    b.Property<int?>("BossID")
+                    b.Property<int>("BossID")
                         .HasColumnType("int");
 
                     b.Property<string>("CostCenter")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Department")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Division")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
@@ -156,35 +168,41 @@ namespace Api.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<long?>("GID")
+                    b.Property<long>("GID")
                         .HasColumnType("bigint");
 
                     b.Property<string>("JobGrade")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("LastName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("ManpowerPlanPlanID")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PlanID")
-                        .HasColumnType("int");
+                    b.Property<string>("PlanID")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Position")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Process")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Section")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ShiftCode")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("EmpID");
-
-                    b.HasIndex("ManpowerPlanPlanID");
 
                     b.ToTable("EmployeeInfo");
                 });
@@ -198,9 +216,6 @@ namespace Api.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GateEntryID"));
 
                     b.Property<int>("EmpID")
-                        .HasColumnType("int");
-
-                    b.Property<int>("EmployeeInfoEmpID")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("EntryDateTime")
@@ -223,8 +238,6 @@ namespace Api.Migrations
 
                     b.HasKey("GateEntryID");
 
-                    b.HasIndex("EmployeeInfoEmpID");
-
                     b.ToTable("GateEntry");
                 });
 
@@ -239,18 +252,13 @@ namespace Api.Migrations
                     b.Property<DateTime>("DateTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("EmpID")
-                        .HasColumnType("int");
-
-                    b.Property<int>("EmployeeInfoEmpID")
+                    b.Property<int?>("EmpID")
                         .HasColumnType("int");
 
                     b.Property<string>("TransType")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EmployeeInfoEmpID");
 
                     b.ToTable("HeadcountTransition");
                 });
@@ -268,10 +276,6 @@ namespace Api.Migrations
 
                     b.Property<DateTime?>("Date")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("EmpID")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("PlannedHeadcount")
                         .HasColumnType("int");
@@ -291,33 +295,28 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Api.Models.ManpowerReq", b =>
                 {
-                    b.Property<string>("MPRID")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<int>("MPRID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MPRID"));
 
                     b.Property<string>("Biz")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ManpowerPlanPlanID")
-                        .HasColumnType("int");
-
                     b.Property<string>("Process")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("Require")
                         .HasColumnType("int");
 
                     b.Property<string>("SkillGroup")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("MPRID");
-
-                    b.HasIndex("ManpowerPlanPlanID");
 
                     b.ToTable("ManpowerReq");
                 });
@@ -345,12 +344,6 @@ namespace Api.Migrations
                     b.Property<int>("EmpID")
                         .HasColumnType("int");
 
-                    b.Property<int>("EmployeeInfoEmpID")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ManpowerReqMPRID")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<string>("Process")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -360,10 +353,6 @@ namespace Api.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("CourseNo");
-
-                    b.HasIndex("EmployeeInfoEmpID");
-
-                    b.HasIndex("ManpowerReqMPRID");
 
                     b.ToTable("OJTandInspectionSkill");
                 });
@@ -377,14 +366,12 @@ namespace Api.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmpID"));
 
                     b.Property<string>("FirstName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Inspection")
                         .HasColumnType("int");
 
                     b.Property<string>("LastName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("MachineSAB1")
@@ -401,10 +388,6 @@ namespace Api.Migrations
 
                     b.Property<int>("Operation")
                         .HasColumnType("int");
-
-                    b.Property<string>("SkillGroup")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("EmpID");
 
@@ -460,13 +443,7 @@ namespace Api.Migrations
                     b.Property<int>("EmpID")
                         .HasColumnType("int");
 
-                    b.Property<int>("EmployeeInfoEmpID")
-                        .HasColumnType("int");
-
                     b.Property<float?>("OT_Hours")
-                        .HasColumnType("real");
-
-                    b.Property<float?>("OverloadHours")
                         .HasColumnType("real");
 
                     b.Property<string>("Status")
@@ -478,151 +455,7 @@ namespace Api.Migrations
 
                     b.HasKey("WorkTimeID");
 
-                    b.HasIndex("EmployeeInfoEmpID");
-
                     b.ToTable("Worktime");
-                });
-
-            modelBuilder.Entity("Api.Models.Attendance", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("Attendance")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EmployeeInfo");
-                });
-
-            modelBuilder.Entity("Api.Models.CleanroomEntry", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("CleanroomEntry")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EmployeeInfo");
-                });
-
-            modelBuilder.Entity("Api.Models.EICC_Control", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("EICC_Control")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Api.Models.WeeklySchedule", "WeeklySchedule")
-                        .WithMany("EICC_Control")
-                        .HasForeignKey("WeeklyScheduleWeekID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EmployeeInfo");
-
-                    b.Navigation("WeeklySchedule");
-                });
-
-            modelBuilder.Entity("Api.Models.EmployeeInfo", b =>
-                {
-                    b.HasOne("Api.Models.ManpowerPlan", "ManpowerPlan")
-                        .WithMany("EmployeeInfo")
-                        .HasForeignKey("ManpowerPlanPlanID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ManpowerPlan");
-                });
-
-            modelBuilder.Entity("Api.Models.GateEntry", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("GateEntry")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EmployeeInfo");
-                });
-
-            modelBuilder.Entity("Api.Models.HeadcountTransition", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("HeadcountTransition")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EmployeeInfo");
-                });
-
-            modelBuilder.Entity("Api.Models.ManpowerReq", b =>
-                {
-                    b.HasOne("Api.Models.ManpowerPlan", "ManpowerPlan")
-                        .WithMany("ManpowerReq")
-                        .HasForeignKey("ManpowerPlanPlanID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ManpowerPlan");
-                });
-
-            modelBuilder.Entity("Api.Models.OJTandInspectionSkill", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("OJTandInspectionSkill")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Api.Models.ManpowerReq", "ManpowerReq")
-                        .WithMany()
-                        .HasForeignKey("ManpowerReqMPRID");
-
-                    b.Navigation("EmployeeInfo");
-
-                    b.Navigation("ManpowerReq");
-                });
-
-            modelBuilder.Entity("Api.Models.Worktime", b =>
-                {
-                    b.HasOne("Api.Models.EmployeeInfo", "EmployeeInfo")
-                        .WithMany("Worktime")
-                        .HasForeignKey("EmployeeInfoEmpID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EmployeeInfo");
-                });
-
-            modelBuilder.Entity("Api.Models.EmployeeInfo", b =>
-                {
-                    b.Navigation("Attendance");
-
-                    b.Navigation("CleanroomEntry");
-
-                    b.Navigation("EICC_Control");
-
-                    b.Navigation("GateEntry");
-
-                    b.Navigation("HeadcountTransition");
-
-                    b.Navigation("OJTandInspectionSkill");
-
-                    b.Navigation("Worktime");
-                });
-
-            modelBuilder.Entity("Api.Models.ManpowerPlan", b =>
-                {
-                    b.Navigation("EmployeeInfo");
-
-                    b.Navigation("ManpowerReq");
-                });
-
-            modelBuilder.Entity("Api.Models.WeeklySchedule", b =>
-                {
-                    b.Navigation("EICC_Control");
                 });
 #pragma warning restore 612, 618
         }

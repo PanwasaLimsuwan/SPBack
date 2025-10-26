@@ -19,7 +19,7 @@ const headcountData = ref([]);
 
 const fetchData = async () => {
   try {
-    const response = await axios.get("https://databasemanpowerdb.database.windows.net/api/ManpowerPlan", {
+    const response = await axios.get("http://localhost:5000/api/ManpowerPlan", {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

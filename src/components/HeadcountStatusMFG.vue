@@ -15,7 +15,7 @@ const isLoading = ref(false);
 const fetchHeadcountData = async () => {
   isLoading.value = true;
   try {
-    const response = await axios.get('https://databasemanpowerdb.database.windows.net/api/GateEntry', {
+    const response = await axios.get('http://localhost:5000/api/GateEntry', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -89,6 +89,8 @@ watch(() => props.filters, async () => {
 // ✅ เริ่มต้น mount component -> fetch data และวาด chart
 onMounted(async () => {
   await fetchHeadcountData();
+  await nextTick();  // รอให้ DOM โหลดเสร็จ
+  drawChart();  // ฟังก์ชันที่ใช้ Plotly วาดกราฟ
 });
 </script>
 

@@ -16,8 +16,8 @@ const fetchEmployees = async () => {
   isLoading.value = true;
   try {
     // ดึงข้อมูลจาก GateEntry
-    // const gateEntryResponse = await axios.get('https://databasemanpowerdb.database.windows.net/api/GateEntry', {
-    const gateEntryResponse = await axios.get('https://databasemanpowerdb-cpbbfhaca3fchbgr.southeastasia-01.azurewebsites.net/api/GateEntry', {
+    // const gateEntryResponse = await axios.get('https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateEntry', {
+    const gateEntryResponse = await axios.get('http://localhost:5000/api/GateEntry', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -28,7 +28,7 @@ const fetchEmployees = async () => {
     });
     
     // ดึงข้อมูลจาก Attendance
-    const attendanceResponse = await axios.get('https://databasemanpowerdb.database.windows.net/api/Attendance/ByDate', {
+    const attendanceResponse = await axios.get('http://localhost:5000/api/Attendance/ByDate', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,
@@ -46,12 +46,12 @@ const fetchEmployees = async () => {
     const missingEmployeeIDs = new Set(attendanceData.filter(att => att.status === 'Missing').map(att => att.empID));
 
     // แสดงผลพนักงานทั้งหมดจาก GateEntry และกำหนดสถานะ "Missing" สำหรับพนักงานที่มีสถานะ "Missing"
-    // employees.value = gateEntryData.map(entry => {
-    //   if (missingEmployeeIDs.has(entry.empID)) {
-    //     entry.status = 'status-missing'; // เปลี่ยนสถานะเป็น 'status-missing' สำหรับพนักงานที่มีสถานะ 'Missing'
-    //   }
-    //   return entry;
-    // });
+    employees.value = gateEntryData.map(entry => {
+      if (missingEmployeeIDs.has(entry.empID)) {
+        entry.status = 'status-missing'; // เปลี่ยนสถานะเป็น 'status-missing' สำหรับพนักงานที่มีสถานะ 'Missing'
+      }
+      return entry;
+    });
 
      
 

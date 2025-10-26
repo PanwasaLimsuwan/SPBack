@@ -10,11 +10,14 @@
   "dependencies": {
     "assert": "^2.1.0",
     "axios": "^1.8.2",
+    "bcryptjs": "^3.0.2",
     "plotly.js": "^2.35.2",
+    "sortablejs": "^1.15.6",
     "stream-browserify": "^3.0.0",
     "vue": "^3.2.13",
     "vue-router": "^4.4.5",
-    "vue-toastification": "^2.0.0-rc.5"
+    "vue-toastification": "^2.0.0-rc.5",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@vue/cli-service": "~5.0.0",

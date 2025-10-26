@@ -47,7 +47,7 @@ export default {
   methods: {
     async fetchWeekOptions() {
       try {
-        const response = await axios.get("https://databasemanpowerdb.database.windows.net/api/EICCControl", {
+        const response = await axios.get("http://localhost:5000/api/EICCControl", {
           params: {
             division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
             department: this.filters.department !== 'ALL' ? this.filters.department : undefined,
@@ -78,7 +78,7 @@ export default {
     async fetchData() {
       try {
         const [workRes, empRes] = await Promise.all([
-          axios.get("https://databasemanpowerdb.database.windows.net/api/EICCControl", {
+          axios.get("http://localhost:5000/api/EICCControl", {
             params: {
               division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
               department: this.filters.department !== 'ALL' ? this.filters.department : undefined,
@@ -88,7 +88,7 @@ export default {
               weekID: this.selectedWeekID,
             },
           }),
-          axios.get("https://databasemanpowerdb.database.windows.net/api/EmployeeInfo"),
+          axios.get("http://localhost:5000/api/EmployeeInfo"),
         ]);
         this.worktime = workRes.data;
         this.employeeInfo = empRes.data;

@@ -35,7 +35,7 @@ const props = defineProps({
 // ฟังก์ชันดึงข้อมูลการขาดงาน
 const fetchAbsentData = async () => {
   try {
-    const res = await axios.get('https://databasemanpowerdb.database.windows.net/api/Attendance', {
+    const res = await axios.get('http://localhost:5000/api/Attendance', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

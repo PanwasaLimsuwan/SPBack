@@ -46,7 +46,7 @@
     methods: {
       async fetchGateEntryData() {
         try {
-          const response = await axios.get('https://databasemanpowerdb.database.windows.net/api/Attendance/ByDate', {
+          const response = await axios.get('http://localhost:5000/api/Attendance/ByDate', {
             params: {
               division: this.filters.division !== 'ALL' ? this.filters.division : undefined,
               department: this.filters.department !== 'ALL' ? this.filters.department : undefined,

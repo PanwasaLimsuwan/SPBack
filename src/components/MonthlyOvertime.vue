@@ -35,7 +35,7 @@ watch(() => props.filters, async () => {
 // ✅ fetch worktime data พร้อม filters
 const fetchWorkTimeData = async () => {
   try {
-    const response = await axios.get('https://databasemanpowerdb.database.windows.net/api/EICCControl/MonthlySummary', {
+    const response = await axios.get('http://localhost:5000/api/EICCControl/MonthlySummary', {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

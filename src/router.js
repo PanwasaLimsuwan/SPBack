@@ -3,11 +3,15 @@ import { createRouter, createWebHistory } from 'vue-router';
 import HomeDashboard from './views/HomeDashboard.vue';
 import DashboardMFG from './views/DashboardMFG.vue';
 import DashboardHR from './views/DashboardHR.vue';
+import CamerasList from './components/CamerasList.vue';
+import Login from './views/Login.vue';
 
 const routes = [
-  { path: '/', component: HomeDashboard },
+  { path: "/", name: "login", component: Login, meta: { guestOnly: true } },
+  { path: '/dashboard', component: HomeDashboard },
   { path: '/dashboard-mfg', component: DashboardMFG },
   { path: '/dashboard-hr', component: DashboardHR },
+  // { path: '/cameras' , component: CamerasList },
 ];
 
 const router = createRouter({

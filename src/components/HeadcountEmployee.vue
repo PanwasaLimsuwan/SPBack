@@ -25,7 +25,7 @@ watch(selectedGroup, drawChart);
 
 async function fetchData() {
   try {
-    const res = await axios.get('https://databasemanpowerdb.database.windows.net/api/GateEntry');
+    const res = await axios.get('http://localhost:5000/api/GateEntry');
     employees.value = res.data;
     drawChart();
   } catch (err) {

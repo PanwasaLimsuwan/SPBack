@@ -65,7 +65,7 @@ const handleBarClick = (event) => {
 // ดึงข้อมูล
 const fetchData = async () => {
   try {
-    const res = await axios.get("https://databasemanpowerdb.database.windows.net/api/ManpowerReq", {
+    const res = await axios.get("http://localhost:5000/api/ManpowerReq", {
       params: {
         division: props.filters.division !== 'ALL' ? props.filters.division : undefined,
         department: props.filters.department !== 'ALL' ? props.filters.department : undefined,

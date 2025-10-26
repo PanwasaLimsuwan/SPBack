@@ -55,7 +55,7 @@ const processes = computed(() => [
 onMounted(async () => {
   try {
     const response = await axios.get(
-      "https://databasemanpowerdb.database.windows.net/api/EmployeeInfo"
+      "http://localhost:5000/api/EmployeeInfo"
     );
     employees.value = response.data;
   } catch (error) {

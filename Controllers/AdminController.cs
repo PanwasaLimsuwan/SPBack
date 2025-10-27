@@ -10,8 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
 using BCrypt.Net;
+using MimeKit;
 
 namespace API_ProductionQuality.Controllers
 {
@@ -66,49 +67,202 @@ public async Task<IActionResult> CheckRegistration([FromQuery] string empID)
 }
 
 
-// POST: api/admin/register
+// // POST: api/admin/register
+// [HttpPost("register")]
+// public async Task<IActionResult> RegisterNewEmployee([FromBody] Admin admin)
+// {
+//     if (admin == null) return BadRequest("Invalid data.");
+
+//     // ตรวจสอบว่า EmpID ใน Admin มีค่าถูกต้องหรือไม่
+//     var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == admin.EmpID);
+//     if (existingAdmin != null) return Conflict("Admin already exists.");
+
+//     // ตรวจสอบ PasswordHash
+//     if (string.IsNullOrEmpty(admin.PasswordHash))
+//     {
+//         return BadRequest("Password is required.");
+//     }
+
+//     // แปลงรหัสผ่านเป็น Hash ก่อนที่จะเก็บในฐานข้อมูล
+//     string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
+
+//     // เพิ่มข้อมูล Admin ใหม่ในฐานข้อมูล
+//     var newAdmin = new Admin
+//     {
+//         EmpID = admin.EmpID,
+//         FirstName = admin.FirstName,
+//         LastName = admin.LastName,
+//         Email = admin.Email,
+//         PasswordHash = hashedPassword,  // เก็บรหัสผ่านที่แปลงเป็น Hash แล้ว
+//         // Role = admin.Role,
+//         Role = "Leader"
+//     };
+
+//     try
+//     {
+//         _context.Admin.Add(newAdmin);
+//         await _context.SaveChangesAsync();
+//         return Ok(new { Message = "Admin registered successfully." });
+//     }
+//     catch (Exception ex)
+//     {
+//         // ถ้ามีข้อผิดพลาดให้แสดงข้อความข้อผิดพลาด
+//         Console.WriteLine("Error during registration: " + ex.Message);
+//         return StatusCode(500, "Internal server error");
+//     }
+// }
+
 [HttpPost("register")]
 public async Task<IActionResult> RegisterNewEmployee([FromBody] Admin admin)
 {
-    if (admin == null) return BadRequest("Invalid data.");
+    if (admin == null) 
+        return BadRequest("Invalid data.");
 
-    // ตรวจสอบว่า EmpID ใน Admin มีค่าถูกต้องหรือไม่
-    var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == admin.EmpID);
-    if (existingAdmin != null) return Conflict("Admin already exists.");
-
-    // ตรวจสอบ PasswordHash
-    if (string.IsNullOrEmpty(admin.PasswordHash))
+    // ตรวจสอบข้อมูลที่สำคัญ (เช่น Email, Password)
+    if (string.IsNullOrEmpty(admin.Email) || string.IsNullOrEmpty(admin.PasswordHash))
     {
-        return BadRequest("Password is required.");
+        return BadRequest("Email or Password is missing.");
     }
 
-    // แปลงรหัสผ่านเป็น Hash ก่อนที่จะเก็บในฐานข้อมูล
+    // เช็คว่า admin มีอยู่ในระบบหรือไม่
+    var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == admin.EmpID);
+    if (existingAdmin != null) 
+        return Conflict("Admin already exists.");
+
+    // แปลงรหัสผ่านเป็น Hash
     string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
 
-    // เพิ่มข้อมูล Admin ใหม่ในฐานข้อมูล
+    // สร้าง Admin ใหม่
     var newAdmin = new Admin
     {
         EmpID = admin.EmpID,
         FirstName = admin.FirstName,
         LastName = admin.LastName,
         Email = admin.Email,
-        PasswordHash = hashedPassword,  // เก็บรหัสผ่านที่แปลงเป็น Hash แล้ว
-        // Role = admin.Role,
-        Role = "Leader"
+        PasswordHash = hashedPassword, 
+        Role = "Leader", // Set default role
     };
 
     try
     {
+        // เพิ่ม Admin ลงในฐานข้อมูล
         _context.Admin.Add(newAdmin);
         await _context.SaveChangesAsync();
+        
+        // ส่งอีเมลแจ้งเตือนหลังจากการลงทะเบียน
+        SendVerificationEmail(newAdmin, admin.PasswordHash);
+
         return Ok(new { Message = "Admin registered successfully." });
+    }
+    catch (DbUpdateException dbEx)
+    {
+        Console.WriteLine("Database update error: " + dbEx.Message);
+        return StatusCode(500, "Database update error");
     }
     catch (Exception ex)
     {
-        // ถ้ามีข้อผิดพลาดให้แสดงข้อความข้อผิดพลาด
         Console.WriteLine("Error during registration: " + ex.Message);
         return StatusCode(500, "Internal server error");
     }
+}
+
+[HttpPost("login")]
+public async Task<IActionResult> Login([FromBody] AdminLoginDto loginDto)
+{
+    if (loginDto == null || string.IsNullOrEmpty(loginDto.Email) || string.IsNullOrEmpty(loginDto.Password))
+    {
+        return BadRequest("Email and Password are required.");
+    }
+
+    try
+    {
+        // ค้นหา admin ตาม Email
+        var admin = await _context.Admin
+            .FirstOrDefaultAsync(a => a.Email == loginDto.Email);
+
+        if (admin == null)
+        {
+            return Unauthorized("Invalid email or password.");
+        }
+
+        // ตรวจสอบว่า Password ที่กรอกมาถูกต้องหรือไม่
+        if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, admin.PasswordHash))
+        {
+            return Unauthorized("Invalid email or password.");
+        }
+
+        // สร้าง JWT Token
+        var token = GenerateJwtToken(admin);
+
+        // ส่ง token กลับไปให้ผู้ใช้
+        return Ok(new { token });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error during login: " + ex.Message);
+        return StatusCode(500, "Internal server error");
+    }
+}
+
+// ฟังก์ชันส่งอีเมลให้กับ Leader
+private void SendVerificationEmail(Admin admin, string password)
+{
+    try
+    {
+        // สร้าง MimeMessage สำหรับส่งอีเมล
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress("Your Company", "your-email@example.com"));
+        message.To.Add(new MailboxAddress(admin.FirstName + " " + admin.LastName, admin.Email));
+        message.Subject = "Your Registration Details";
+
+        // สร้างเนื้อหาอีเมล
+        var bodyBuilder = new BodyBuilder
+        {
+            TextBody = $"Hello {admin.FirstName} {admin.LastName},\n\n" +
+                       $"Your account has been created successfully. Your default password is: {password}\n" +
+                       "Please log in and change your password as soon as possible.\n\n" +
+                       "Best regards,\nYour Company"
+        };
+
+        message.Body = bodyBuilder.ToMessageBody();
+
+        // เชื่อมต่อและส่งอีเมลผ่าน SMTP
+        using (var client = new SmtpClient())
+        {
+            client.Connect("smtp.gmail.com", 587, MailKit.Security.SecureSocketOptions.StartTls);
+            
+            // ใช้ App Password
+            client.Authenticate("panwasalimsuwan@gmail.com", "xemtsrhrnzpddwjl");  // ใช้ App Password แทนรหัสผ่านปกติ
+            
+            client.Send(message);
+            client.Disconnect(true);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error sending email: " + ex.Message);
+        throw new Exception("Error sending email: " + ex.Message);
+    }
+}
+
+private string GenerateJwtToken(Admin admin)
+{
+    var key = _configuration["Jwt:Key"];
+    var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer: _configuration["Jwt:Issuer"],
+        audience: _configuration["Jwt:Audience"],
+        claims: new List<Claim>
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, admin.Email),  // ใช้ Email เป็น Subject
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        },
+        expires: DateTime.UtcNow.AddHours(1),  // ตั้งเวลาให้หมดอายุภายใน 1 ชั่วโมง
+        signingCredentials: creds
+    );
+
+    return new JwtSecurityTokenHandler().WriteToken(token);  // สร้างและแปลงเป็น JWT Token
 }
 
         // ฟังก์ชันยืนยันอีเมล

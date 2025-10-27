@@ -20,13 +20,14 @@ SELECT ei.Process, s.SkillName,
 FROM EmployeeInfo ei
 LEFT JOIN OJTandInspectionSkill o ON o.EmpID = ei.EmpID
 LEFT JOIN Skill s ON s.SkillID = o.SkillID
-WHERE (@Division = 'ALL' OR ei.Division = @Division)
-  AND (@Department = 'ALL' OR ei.Department = @Department)
-  AND (@Section = 'ALL' OR ei.Section = @Section)
-  AND (@Biz = 'ALL' OR ei.Biz = @Biz)
-  AND (@Process = 'ALL' OR ei.Process = @Process)
+WHERE COALESCE(@Division, 'ALL') = 'ALL' OR ei.Division = @Division
+  AND COALESCE(@Department, 'ALL') = 'ALL' OR ei.Department = @Department
+  AND COALESCE(@Section, 'ALL') = 'ALL' OR ei.Section = @Section
+  AND COALESCE(@Biz, 'ALL') = 'ALL' OR ei.Biz = @Biz
+  AND COALESCE(@Process, 'ALL') = 'ALL' OR ei.Process = @Process
 GROUP BY ei.Process, s.SkillName
 ORDER BY GapCount DESC;
+
 ";
         using var db = Conn();
         return await db.QueryAsync(sql, new {

@@ -30,7 +30,5 @@ namespace Api.Models
 
         [Required]
         public string Role { get; set; }
-
-        public DateTime CreatedAt { get; set; } // เก็บวันที่สร้าง
     }
 }

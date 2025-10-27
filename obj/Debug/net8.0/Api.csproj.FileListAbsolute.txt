@@ -431,8 +431,6 @@ C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win-x86\nativ
 C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win-arm64\native\sni.dll
 C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win-x64\native\sni.dll
 C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win-x86\native\sni.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\unix\lib\net8.0\System.Data.SqlClient.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.Data.SqlClient.dll
 C:\Code\special project\2024\backend\api\obj\Debug\net8.0\Api.csproj.AssemblyReference.cache
 C:\Code\special project\2024\backend\api\obj\Debug\net8.0\Api.GeneratedMSBuildEditorConfig.editorconfig
 C:\Code\special project\2024\backend\api\obj\Debug\net8.0\Api.AssemblyInfoInputs.cache
@@ -468,8 +466,8 @@ C:\Code\special project\2024\backend\api\bin\Debug\net8.0\pl\Microsoft.Data.SqlC
 C:\Code\special project\2024\backend\api\bin\Debug\net8.0\tr\Microsoft.Data.SqlClient.resources.dll
 C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.Diagnostics.EventLog.dll
 C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.Security.Cryptography.Pkcs.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\Microsoft.Extensions.Caching.Abstractions.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\Microsoft.Extensions.DependencyInjection.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\Microsoft.Extensions.Logging.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\Microsoft.Extensions.Primitives.dll
-C:\Code\special project\2024\backend\api\bin\Debug\net8.0\System.Diagnostics.DiagnosticSource.dll
+C:\Code\special project\2024\backend\api\bin\Debug\net8.0\BouncyCastle.Cryptography.dll
+C:\Code\special project\2024\backend\api\bin\Debug\net8.0\MailKit.dll
+C:\Code\special project\2024\backend\api\bin\Debug\net8.0\MimeKit.dll
+C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\unix\lib\netcoreapp2.1\System.Data.SqlClient.dll
+C:\Code\special project\2024\backend\api\bin\Debug\net8.0\runtimes\win\lib\netcoreapp2.1\System.Data.SqlClient.dll

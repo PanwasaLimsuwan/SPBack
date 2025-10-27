@@ -3,17 +3,16 @@
     <div class="card">
       <img src="/logo2.png" alt="Logo" class="logo" />
       <h2 v-if="isLogin">Sign in</h2>
-      <h2 v-if="!isLogin">Sign up</h2>
 
-      <!-- Register Form -->
+      <!-- Login Form -->
       <form @submit.prevent="onSubmit">
         <div class="form-group">
-          <label>Username</label>
+          <label>Email</label>
           <input
-            v-model.trim="username"
-            type="text"
-            placeholder="Enter username"
-            autocomplete="username"
+            v-model.trim="email"
+            type="email"
+            placeholder="Enter email"
+            autocomplete="email"
             :disabled="loading"
           />
         </div>
@@ -29,54 +28,23 @@
           />
         </div>
 
-        <div class="form-group">
-          <label>Email</label>
-          <input
-            v-model.trim="email"
-            type="email"
-            placeholder="Enter email"
-            autocomplete="email"
-            :disabled="loading"
-          />
-        </div>
-
-        <div class="form-group">
-          <label>Employee ID</label>
-          <input
-            v-model.trim="empID"
-            type="text"
-            placeholder="Enter employee ID"
-            :disabled="loading"
-          />
-        </div>
-
-        <div class="form-group">
-          <label>Role</label>
-          <select v-model="role" :disabled="loading">
-            <option value="admin">Admin</option>
-            <option value="leader">Leader</option>
-            <option value="employee">Employee</option>
-          </select>
-        </div>
-
         <div class="options">
           <label><input type="checkbox" v-model="showPassword" /> Show password</label>
-          <label><input type="checkbox" v-model="remember" /> Remember me</label>
+          <!-- <label><input type="checkbox" v-model="remember" /> Remember me</label> -->
         </div>
 
         <button class="btn" type="submit" :disabled="loading">
-          <span v-if="!loading">{{ isLogin ? 'Login' : 'Sign up' }}</span>
+          <span v-if="!loading">Login</span>
           <span v-else>Signing in...</span>
         </button>
 
         <p v-if="error" class="error">{{ error }}</p>
       </form>
 
-      <p class="hint">
+      <!-- <p class="hint">
         <span v-if="isLogin">Don't have an account?</span>
-        <span v-if="!isLogin">Already have an account?</span>
-        <a href="#" @click.prevent="toggleAuthMode">{{ isLogin ? 'Sign up' : 'Login' }}</a>
-      </p>
+        <a href="#" @click.prevent="toggleAuthMode">Sign up</a>
+      </p> -->
     </div>
   </div>
 </template>
@@ -102,26 +70,13 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
-// login function (mock หรือ api จริง)
-async function doLogin({ username, password }) {
+// login function
+async function doLogin({ email, password }) {
   const { data } = await axios.post(`${API_BASE_URL}/api/Admin/login`, {
-    Username: username,
+    Email: email,   // ใช้ Email แทน Username
     Password: password,  // ส่งรหัสผ่านธรรมดา
   });
 
-  if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
-  setToken(data.token);
-  return data;
-}
-
-async function doRegister({ username, password, email, empID, role }) {
-  const { data } = await axios.post(`${API_BASE_URL}/api/Admin/register`, {
-    Username: username,
-    Password: password,
-    Email: email,  // ส่งอีเมล
-    EmpID: empID,  // ส่งรหัสพนักงาน
-    Role: role, // ส่ง role
-  });
   if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
   setToken(data.token);
   return data;
@@ -131,18 +86,15 @@ async function doRegister({ username, password, email, empID, role }) {
 const route = useRoute();
 const router = useRouter();
 
-const username = ref("");
+const email = ref("");  // ใช้แค่ Email สำหรับการ Login
 const password = ref("");
-const email = ref("");
-const empID = ref("");
-const role = ref("employee");  // Default role is 'employee'
 const remember = ref(true);
 const showPassword = ref(false);
 const loading = ref(false);
 const error = ref("");
-const isLogin = ref(true);  // This controls whether it's Login or Register
+const isLogin = ref(true);  // ใช้เฉพาะ Login
 
-// Toggle between Login and Register
+// Toggle between Login and Register (จะใช้แค่ Login ตอนนี้)
 function toggleAuthMode() {
   isLogin.value = !isLogin.value;
 }
@@ -150,31 +102,17 @@ function toggleAuthMode() {
 // ====== Methods ======
 async function onSubmit() {
   error.value = "";
-  if (!username.value || !password.value || !email.value || !empID.value || !role.value) {
+  if (!email.value || !password.value) {
     error.value = "กรุณากรอกข้อมูลทั้งหมด";
     return;
   }
 
   try {
     loading.value = true;
-    let token;
-
-    if (isLogin.value) {
-      const { Token: loginToken } = await doLogin({
-        username: username.value,
-        password: password.value
-      });
-      token = loginToken;
-    } else {
-      const { Token: registerToken } = await doRegister({
-        username: username.value,
-        password: password.value,
-        email: email.value,
-        empID: empID.value,
-        role: role.value
-      });
-      token = registerToken;
-    }
+    const { token } = await doLogin({
+      email: email.value,  // ใช้ email
+      password: password.value,
+    });
 
     setToken(token);
     router.push("/dashboard");
@@ -185,6 +123,7 @@ async function onSubmit() {
   }
 }
 </script>
+
 
 <style scoped>
 .auth-page {

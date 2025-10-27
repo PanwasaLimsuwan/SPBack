@@ -288,6 +288,25 @@ const saveAssignment = async () => {
     console.error("Error creating assignment:", error);
     alert("บันทึกไม่สำเร็จ:\n" + (error?.response?.data || error.message));
   }
+
+  try {
+    const response = await axios.post("http://localhost:5000/api/Assignment", payload);
+
+    // เมื่อบันทึก Assignment สำเร็จ ให้ส่งการแจ้งเตือนอีเมล
+    if (response.status === 200) {
+      alert("บันทึกข้อมูล Assignment สำเร็จ");
+      // ส่งคำขอแจ้งเตือนอีเมล
+      await axios.post("http://localhost:5000/api/Assignment/notify", {
+        empID: selectedEmployee.value.empID,
+        toProcess: selectedEmployee.value.toProcess,
+        toBiz: selectedEmployee.value.toBiz
+      });
+      closeModal();
+    }
+  } catch (error) {
+    console.error("Error creating assignment:", error);
+    alert("บันทึกไม่สำเร็จ:\n" + (error?.response?.data || error.message));
+  }
 };
 
 // ปิดงาน (Remove) → อัปเดต EndAt + Status

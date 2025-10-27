@@ -1,38 +1,3 @@
-<template>
-  <div>
-    <h1>Admin Dashboard</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>EmpID</th>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>Email</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody v-if="employees.length > 0">
-        <tr v-for="employee in employees" :key="employee.empID">
-          <td>{{ employee.empID }}</td>
-          <td>{{ employee.firstName }}</td>
-          <td>{{ employee.lastName }}</td>
-          <td>{{ employee.email }}</td>
-          <td>
-            <button @click="registerEmployee(employee)">Register</button>
-            <button @click="editEmployee(employee)">Edit</button>
-            <button @click="deleteEmployee(employee.empID)">Delete</button>
-          </td>
-        </tr>
-      </tbody>
-      <tbody v-else>
-        <tr>
-          <td colspan="5">ไม่พบข้อมูล</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</template>
-
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';

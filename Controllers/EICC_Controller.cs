@@ -79,15 +79,11 @@ namespace Api.Controllers
                                     empID = reader.GetInt32(1),
                                     weekID = reader.GetInt32(2),
                                     monthYear = reader["MonthYear"]?.ToString(),
-                                    totalHours = reader.IsDBNull(4)
-                                        ? null
-                                        : (float?)reader.GetFloat(4),
+                                    totalHours = reader.IsDBNull(4) ? (decimal?)null : Convert.ToDecimal(reader.GetValue(4)),
                                     daysWorked = reader.IsDBNull(5)
                                         ? null
                                         : (int?)reader.GetInt32(5),
-                                    totalOT = reader.IsDBNull(6)
-                                        ? null
-                                        : (float?)reader.GetDouble(6),
+                                    totalOT    = reader.IsDBNull(6) ? (decimal?)null : Convert.ToDecimal(reader.GetValue(6)),
                                     status = reader["Status"]?.ToString(),
                                     division = reader["Division"]?.ToString(),
                                     department = reader["Department"]?.ToString(),
@@ -165,12 +161,14 @@ namespace Api.Controllers
                                 new
                                 {
                                     month = reader["MonthYear"].ToString(),
-                                    totalOT = reader.IsDBNull(reader.GetOrdinal("TotalOT"))
-                                        ? 0
-                                        : Convert.ToDouble(reader["TotalOT"]),
-                                    totalHours = reader.IsDBNull(reader.GetOrdinal("TotalHours"))
-                                        ? 0
-                                        : Convert.ToDouble(reader["TotalHours"]),
+                                    // totalOT = reader.IsDBNull(reader.GetOrdinal("TotalOT"))
+                                    //     ? 0
+                                    //     : Convert.ToDouble(reader["TotalOT"]),
+                                    // totalHours = reader.IsDBNull(reader.GetOrdinal("TotalHours"))
+                                    //     ? 0
+                                    //     : Convert.ToDouble(reader["TotalHours"]),
+                                    totalOT    = reader.IsDBNull(1) ? 0m : reader.GetDecimal(1),
+        totalHours = reader.IsDBNull(2) ? 0m : reader.GetDecimal(2),
                                     employeeCount = Convert.ToInt32(reader["EmployeeCount"]),
                                 }
                             );

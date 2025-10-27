@@ -6,8 +6,8 @@ namespace Api.Models
     {
         [Key]
         public int EmpID { get; set; }          // รหัสพนักงาน
-        public string FirstName { get; set; }   // ชื่อพนักงาน
-        public string LastName { get; set; }    // นามสกุลพนักงาน
+        public string? FirstName { get; set; }   // ชื่อพนักงาน
+        public string? LastName { get; set; }    // นามสกุลพนักงาน
         // public string Division { get; set; }    // แผนกที่พนักงานสังกัด
         // public string Department { get; set; }  // หน่วยงานที่พนักงานสังกัด
         // public string Position { get; set; }    // ตำแหน่งพนักงาน

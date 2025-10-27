@@ -22,6 +22,9 @@ namespace Api.Jobs
                 try
                 {
                     var client = _httpClientFactory.CreateClient();
+                    // var response = await client.PostAsync("https://databasemanpowerdb-cpbbfhaca3fchbgr.southeastasia-01.azurewebsites.net/api/GateToWorktime", null);
+                    // var response = await client.PostAsync("https://deploymanpowerdb-f5a0h6fqaehdajck.southeastasia-01.azurewebsites.net/api/GateToWorktime", null);
+                    // var response = await client.PostAsync("https://databasemanpowerdb.database.windows.net/api/GateToWorktime", null);
                     var response = await client.PostAsync("http://localhost:5000/api/GateToWorktime", null);
                     Console.WriteLine($"[CalculatedWorktimeJob] Response: {response.StatusCode} @ {DateTime.Now}");
                 }

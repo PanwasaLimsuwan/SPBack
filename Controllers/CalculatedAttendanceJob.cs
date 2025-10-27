@@ -84,11 +84,11 @@ namespace Api.Services
                 }
             }
 
-            Console.WriteLine($"[CalculatedAttendanceJob] Updated at {DateTime.Now}");
+            // Console.WriteLine($"[CalculatedAttendanceJob] Updated at {DateTime.Now}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CalculatedAttendanceJob] ERROR: {ex.Message}");
+            // Console.WriteLine($"[CalculatedAttendanceJob] ERROR: {ex.Message}");
         }
 
         // รอ 10 วินาทีแล้วทำงานต่อ
@@ -151,7 +151,7 @@ private async Task InsertAttendance(SqlConnection conn, int empID, DateTime entr
     // ถ้ามีข้อมูลแล้วให้ข้ามการ insert
     if (existingRecordCount > 0)
     {
-        Console.WriteLine($"[InsertAttendance] Duplicate entry found for EmpID: {empID} on {entryDateTime.Date}. Skipping insert.");
+        // Console.WriteLine($"[InsertAttendance] Duplicate entry found for EmpID: {empID} on {entryDateTime.Date}. Skipping insert.");
         return; // ข้ามการ insert
     }
     // If the status is "Missing", set CheckInTime to NULL

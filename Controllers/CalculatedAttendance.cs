@@ -60,7 +60,7 @@ namespace Api.Controllers
                         var count = (int)await checkCmd.ExecuteScalarAsync();
 
                         // เพิ่มการ log เพื่อตรวจสอบผลลัพธ์
-                        Console.WriteLine($"EmpID: {empID}, Status: {status}, Count: {count}");
+                        // Console.WriteLine($"EmpID: {empID}, Status: {status}, Count: {count}");
 
                         // ถ้าจำนวนแถวที่พบเป็น 0 ให้ทำการ insert
                         if (count == 0)

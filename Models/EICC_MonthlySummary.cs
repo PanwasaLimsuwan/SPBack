@@ -10,8 +10,8 @@ namespace Api.Models
         public int EmpID { get; set; }
         public int Year { get; set; }
         public int Month { get; set; }
-        public int OT_Total { get; set; }           // OT ทั้งหมด
-        public float EICC_Hours { get; set; }       // เช่น 240 hrs
-        public float TotalHours { get; set; }       // เวลารวมในเดือนนั้น
+        public decimal OT_Total { get; set; }      // OT ทั้งหมด
+    public decimal EICC_Hours { get; set; }    // เช่น 240.5 hrs
+    public decimal TotalHours { get; set; }    // เวลารวมในเดือนนั้น
     }
 }

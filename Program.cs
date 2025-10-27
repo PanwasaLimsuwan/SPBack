@@ -34,6 +34,8 @@ builder.Services.AddHostedService<CalculatedWorktimeJob>();
 builder.Services.AddHostedService<CalculatedOTJob>();
 builder.Services.AddHostedService<Api.Services.CalculatedAttendanceJob>();
 // builder.Services.AddHostedService<CalculatedAttendanceJob>();
+builder.Services.AddSingleton<AnalyticsRepository>();
+builder.Services.AddScoped<AnalyticsRepository>(); // 👈 เพิ่มบรรทัดนี้
 
 var app = builder.Build();
 

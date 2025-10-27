@@ -29,6 +29,36 @@
           />
         </div>
 
+        <div class="form-group">
+          <label>Email</label>
+          <input
+            v-model.trim="email"
+            type="email"
+            placeholder="Enter email"
+            autocomplete="email"
+            :disabled="loading"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input
+            v-model.trim="empID"
+            type="text"
+            placeholder="Enter employee ID"
+            :disabled="loading"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Role</label>
+          <select v-model="role" :disabled="loading">
+            <option value="admin">Admin</option>
+            <option value="leader">Leader</option>
+            <option value="employee">Employee</option>
+          </select>
+        </div>
+
         <div class="options">
           <label><input type="checkbox" v-model="showPassword" /> Show password</label>
           <label><input type="checkbox" v-model="remember" /> Remember me</label>
@@ -55,7 +85,6 @@
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
-import bcrypt from 'bcryptjs'; // ใช้ bcrypt สำหรับการแฮชรหัสผ่าน
 
 // ====== Config & Helpers ======
 const API_BASE_URL = "http://localhost:5000";
@@ -75,27 +104,28 @@ function getToken() {
 
 // login function (mock หรือ api จริง)
 async function doLogin({ username, password }) {
-    const { data } = await axios.post(`${API_BASE_URL}/api/Admin/login`, {
-        Username: username,
-        Password: password,  // ส่งรหัสผ่านธรรมดา
-    });
+  const { data } = await axios.post(`${API_BASE_URL}/api/Admin/login`, {
+    Username: username,
+    Password: password,  // ส่งรหัสผ่านธรรมดา
+  });
 
-    if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
-    setToken(data.token);
-    return data;
+  if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
+  setToken(data.token);
+  return data;
 }
 
-async function doRegister({ username, password }) {
-    const { data } = await axios.post(`${API_BASE_URL}/api/Admin/register`, {
-        Username: username,
-        Password: password,  // ส่งรหัสผ่านธรรมดา
-    });
-    if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
-    setToken(data.token);
-    return data;
+async function doRegister({ username, password, email, empID, role }) {
+  const { data } = await axios.post(`${API_BASE_URL}/api/Admin/register`, {
+    Username: username,
+    Password: password,
+    Email: email,  // ส่งอีเมล
+    EmpID: empID,  // ส่งรหัสพนักงาน
+    Role: role, // ส่ง role
+  });
+  if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
+  setToken(data.token);
+  return data;
 }
-
-
 
 // ====== State ======
 const route = useRoute();
@@ -103,6 +133,9 @@ const router = useRouter();
 
 const username = ref("");
 const password = ref("");
+const email = ref("");
+const empID = ref("");
+const role = ref("employee");  // Default role is 'employee'
 const remember = ref(true);
 const showPassword = ref(false);
 const loading = ref(false);
@@ -117,8 +150,8 @@ function toggleAuthMode() {
 // ====== Methods ======
 async function onSubmit() {
   error.value = "";
-  if (!username.value || !password.value) {
-    error.value = "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน";
+  if (!username.value || !password.value || !email.value || !empID.value || !role.value) {
+    error.value = "กรุณากรอกข้อมูลทั้งหมด";
     return;
   }
 
@@ -135,7 +168,10 @@ async function onSubmit() {
     } else {
       const { Token: registerToken } = await doRegister({
         username: username.value,
-        password: password.value
+        password: password.value,
+        email: email.value,
+        empID: empID.value,
+        role: role.value
       });
       token = registerToken;
     }
@@ -148,7 +184,6 @@ async function onSubmit() {
     loading.value = false;
   }
 }
-
 </script>
 
 <style scoped>

@@ -223,16 +223,7 @@ function applyLayoutFromIds(ids) {
 }
 
 // โหลดลำดับจาก API (หลังจาก mount)
-onMounted(async () => {
-  try {
-    const res = await api.get('/WidgetOrder', { params: { contextKey: 'mfg_dashboard' } });
-    if (Array.isArray(res.data?.layout) && res.data.layout.length) {
-      applyLayoutFromIds(res.data.layout);
-    }
-  } catch (e) {
-    console.warn('Load widget order failed', e);
-  }
-});
+
 
 // debounce save เมื่อ reorder
 // let t = null;

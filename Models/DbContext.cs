@@ -32,6 +32,9 @@ namespace Api.Models
         // DbSet สำหรับการจัดการข้อมูล GateEntry
         public DbSet<GateEntry> GateEntry { get; set; }
 
+        // DbSet สำหรับการจัดการข้อมูล FaceEntry
+        public DbSet<FaceEntry> FaceEntry { get; set; }
+
         // DbSet สำหรับการจัดการข้อมูล Attendance
         public DbSet<Attendance> Attendance { get; set; }
 

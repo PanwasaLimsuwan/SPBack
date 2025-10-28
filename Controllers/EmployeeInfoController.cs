@@ -76,53 +76,105 @@ namespace Api.Controllers
         }
 
         [HttpGet("get-supervisors")]
-public async Task<IActionResult> GetSupervisors()
-{
-    var supervisors = new List<EmployeeInfo>();
-
-    // ใช้ SqlConnection เพื่อดึงข้อมูลจากฐานข้อมูล
-    using (SqlConnection conn = new SqlConnection(_connectionString))
-    {
-        await conn.OpenAsync();
-
-        // คิวรีเพื่อดึงข้อมูลพนักงานที่มี Position เป็น "Supervisor"
-        string query = "SELECT * FROM EmployeeInfo WHERE Position = 'Supervisor'";
-
-        using (SqlCommand cmd = new SqlCommand(query, conn))
-        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+        public async Task<IActionResult> GetSupervisors()
         {
-            while (await reader.ReadAsync())
+            var supervisors = new List<EmployeeInfo>();
+
+            // ใช้ SqlConnection เพื่อดึงข้อมูลจากฐานข้อมูล
+            using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                // ดึงข้อมูลพนักงานจากฐานข้อมูลที่ตรงกับเงื่อนไข
-                supervisors.Add(
-                    new EmployeeInfo
+                await conn.OpenAsync();
+
+                // คิวรีเพื่อดึงข้อมูลพนักงานที่มี Position เป็น "Supervisor"
+                string query = "SELECT * FROM EmployeeInfo WHERE Position = 'Supervisor'";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
                     {
-                        EmpID = (int)reader["EmpID"],
-                        GID = reader["GID"] is DBNull ? 0 : (long)reader["GID"],
-                        FirstName = reader["FirstName"]?.ToString(),
-                        LastName = reader["LastName"]?.ToString(),
-                        Division = reader["Division"]?.ToString(),
-                        Department = reader["Department"]?.ToString(),
-                        Section = reader["Section"]?.ToString(),
-                        JobGrade = reader["JobGrade"]?.ToString(),
-                        BossID = reader["BossID"] is DBNull ? 0 : (int)reader["BossID"],
-                        BossGID = reader["BossGID"] is DBNull ? 0 : (long)reader["BossGID"],
-                        CostCenter = reader["CostCenter"]?.ToString(),
-                        ShiftCode = reader["ShiftCode"]?.ToString(),
-                        Position = reader["Position"]?.ToString(),
-                        Email = reader["Email"]?.ToString(),
-                        Biz = reader["Biz"]?.ToString(),
-                        Process = reader["Process"]?.ToString(),
-                        PlanID = Convert.IsDBNull(reader["PlanID"]) ? null : reader["PlanID"].ToString(),
+                        // ดึงข้อมูลพนักงานจากฐานข้อมูลที่ตรงกับเงื่อนไข
+                        supervisors.Add(
+                            new EmployeeInfo
+                            {
+                                EmpID = (int)reader["EmpID"],
+                                GID = reader["GID"] is DBNull ? 0 : (long)reader["GID"],
+                                FirstName = reader["FirstName"]?.ToString(),
+                                LastName = reader["LastName"]?.ToString(),
+                                Division = reader["Division"]?.ToString(),
+                                Department = reader["Department"]?.ToString(),
+                                Section = reader["Section"]?.ToString(),
+                                JobGrade = reader["JobGrade"]?.ToString(),
+                                BossID = reader["BossID"] is DBNull ? 0 : (int)reader["BossID"],
+                                BossGID = reader["BossGID"] is DBNull ? 0 : (long)reader["BossGID"],
+                                CostCenter = reader["CostCenter"]?.ToString(),
+                                ShiftCode = reader["ShiftCode"]?.ToString(),
+                                Position = reader["Position"]?.ToString(),
+                                Email = reader["Email"]?.ToString(),
+                                Biz = reader["Biz"]?.ToString(),
+                                Process = reader["Process"]?.ToString(),
+                                PlanID = Convert.IsDBNull(reader["PlanID"])
+                                    ? null
+                                    : reader["PlanID"].ToString(),
+                            }
+                        );
                     }
-                );
+                }
             }
+
+            // ส่งข้อมูลพนักงานที่มี Position เป็น Technician กลับไป
+            return Ok(supervisors);
         }
-    }
 
-    // ส่งข้อมูลพนักงานที่มี Position เป็น Supervisor กลับไป
-    return Ok(supervisors);
-}
+        [HttpGet("get-technicians")]
+        public async Task<IActionResult> GetTechnicians()
+        {
+            var technicians = new List<EmployeeInfo>();
 
+            // ใช้ SqlConnection เพื่อดึงข้อมูลจากฐานข้อมูล
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+
+                // คิวรีเพื่อดึงข้อมูลพนักงานที่มี Position เป็น "Technician"
+                string query = "SELECT * FROM EmployeeInfo WHERE Position = 'Technician'";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        // ดึงข้อมูลพนักงานจากฐานข้อมูลที่ตรงกับเงื่อนไข
+                        technicians.Add(
+                            new EmployeeInfo
+                            {
+                                EmpID = (int)reader["EmpID"],
+                                GID = reader["GID"] is DBNull ? 0 : (long)reader["GID"],
+                                FirstName = reader["FirstName"]?.ToString(),
+                                LastName = reader["LastName"]?.ToString(),
+                                Division = reader["Division"]?.ToString(),
+                                Department = reader["Department"]?.ToString(),
+                                Section = reader["Section"]?.ToString(),
+                                JobGrade = reader["JobGrade"]?.ToString(),
+                                BossID = reader["BossID"] is DBNull ? 0 : (int)reader["BossID"],
+                                BossGID = reader["BossGID"] is DBNull ? 0 : (long)reader["BossGID"],
+                                CostCenter = reader["CostCenter"]?.ToString(),
+                                ShiftCode = reader["ShiftCode"]?.ToString(),
+                                Position = reader["Position"]?.ToString(),
+                                Email = reader["Email"]?.ToString(),
+                                Biz = reader["Biz"]?.ToString(),
+                                Process = reader["Process"]?.ToString(),
+                                PlanID = Convert.IsDBNull(reader["PlanID"])
+                                    ? null
+                                    : reader["PlanID"].ToString(),
+                            }
+                        );
+                    }
+                }
+            }
+
+            // ส่งข้อมูลพนักงานที่มี Position เป็น Technician กลับไป
+            return Ok(technicians);
+        }
     }
 }

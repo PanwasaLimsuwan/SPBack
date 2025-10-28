@@ -30,8 +30,8 @@ namespace API_ProductionQuality.Controllers
         }
 
         // ตรวจสอบว่า EmpID ใน EmployeeInfo เป็น Supervisor และยังไม่ได้ลงทะเบียนใน Admin หรือไม่
-        [HttpGet("check-registration")]
-public async Task<IActionResult> CheckRegistration([FromQuery] string empID)
+        [HttpGet("check-registration-leader")]
+public async Task<IActionResult> CheckRegistrationForLeader([FromQuery] string empID)
 {
     if (string.IsNullOrEmpty(empID))
     {
@@ -56,6 +56,42 @@ public async Task<IActionResult> CheckRegistration([FromQuery] string empID)
         }
 
         Console.WriteLine($"EmpID {empIDInt} not found or not a Supervisor");
+
+        return Ok(new { isRegistered = false });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error occurred while checking registration: {ex.Message}");
+        return StatusCode(500, "Internal server error");
+    }
+}
+
+        [HttpGet("check-registration-admin")]
+public async Task<IActionResult> CheckRegistrationForAdmin([FromQuery] string empID)
+{
+    if (string.IsNullOrEmpty(empID))
+    {
+        return BadRequest("EmpID cannot be null or empty.");
+    }
+
+    int empIDInt;
+    if (!int.TryParse(empID, out empIDInt))  // ตรวจสอบการแปลง EmpID เป็น int
+    {
+        return BadRequest("Invalid EmpID format.");
+    }
+
+    try
+    {
+        // ตรวจสอบว่า EmpID เป็นตัวใหญ่ในฐานข้อมูลและตำแหน่งเป็น "Admin"
+        var employee = await _context.EmployeeInfo
+            .FirstOrDefaultAsync(e => e.EmpID == empIDInt && e.Position == "Admin");  // ใช้ EmpID แทน empID
+
+        if (employee != null)
+        {
+            return Ok(new { isRegistered = true });
+        }
+
+        Console.WriteLine($"EmpID {empIDInt} not found or not a Admin");
 
         return Ok(new { isRegistered = false });
     }
@@ -112,8 +148,8 @@ public async Task<IActionResult> CheckRegistration([FromQuery] string empID)
 //     }
 // }
 
-[HttpPost("register")]
-public async Task<IActionResult> RegisterNewEmployee([FromBody] Admin admin)
+[HttpPost("register-leader")]
+public async Task<IActionResult> RegisterNewEmployeeForLeader([FromBody] Admin admin)
 {
     if (admin == null) 
         return BadRequest("Invalid data.");
@@ -166,6 +202,178 @@ public async Task<IActionResult> RegisterNewEmployee([FromBody] Admin admin)
     }
 }
 
+[HttpPost("register-admin")]
+public async Task<IActionResult> RegisterNewEmployeeForAdmin([FromBody] Admin admin)
+{
+    if (admin == null) 
+        return BadRequest("Invalid data.");
+
+    // ตรวจสอบข้อมูลที่สำคัญ (เช่น Email, Password)
+    if (string.IsNullOrEmpty(admin.Email) || string.IsNullOrEmpty(admin.PasswordHash))
+    {
+        return BadRequest("Email or Password is missing.");
+    }
+
+    // เช็คว่า admin มีอยู่ในระบบหรือไม่
+    var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == admin.EmpID);
+    if (existingAdmin != null) 
+        return Conflict("Admin already exists.");
+
+    // แปลงรหัสผ่านเป็น Hash
+    string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
+
+    // สร้าง Admin ใหม่
+    var newAdmin = new Admin
+    {
+        EmpID = admin.EmpID,
+        FirstName = admin.FirstName,
+        LastName = admin.LastName,
+        Email = admin.Email,
+        PasswordHash = hashedPassword, 
+        Role = "Admin", // Set default role
+    };
+
+    try
+    {
+        // เพิ่ม Admin ลงในฐานข้อมูล
+        _context.Admin.Add(newAdmin);
+        await _context.SaveChangesAsync();
+        
+        // ส่งอีเมลแจ้งเตือนหลังจากการลงทะเบียน
+        SendVerificationEmail(newAdmin, admin.PasswordHash);
+
+        return Ok(new { Message = "Admin registered successfully." });
+    }
+    catch (DbUpdateException dbEx)
+    {
+        Console.WriteLine("Database update error: " + dbEx.Message);
+        return StatusCode(500, "Database update error");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error during registration: " + ex.Message);
+        return StatusCode(500, "Internal server error");
+    }
+}
+
+// [HttpPost("register-admin")]
+// public async Task<IActionResult> RegisterAdmin([FromBody] Admin admin)
+// {
+//     if (admin == null) 
+//         return BadRequest("Invalid data.");
+
+//     // ตรวจสอบข้อมูลที่สำคัญ (เช่น Email, Password)
+//     if (string.IsNullOrEmpty(admin.Email) || string.IsNullOrEmpty(admin.PasswordHash))
+//     {
+//         return BadRequest("Email or Password is missing.");
+//     }
+
+//     // เช็คว่า admin มีอยู่ในระบบหรือไม่
+//     var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == admin.EmpID);
+//     if (existingAdmin != null) 
+//         return Conflict("Admin already exists.");
+
+//     // แปลงรหัสผ่านเป็น Hash
+//     string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
+
+//     // สร้าง Admin ใหม่
+//     var newAdmin = new Admin
+//     {
+//         EmpID = admin.EmpID,
+//         FirstName = admin.FirstName,
+//         LastName = admin.LastName,
+//         Email = admin.Email,
+//         PasswordHash = hashedPassword, 
+//         Role = "Admin"  // Role สำหรับ Admin
+//     };
+
+//     try
+//     {
+//         // เพิ่ม Admin ลงในฐานข้อมูล
+//         _context.Admin.Add(newAdmin);
+//         await _context.SaveChangesAsync();
+        
+//         // ส่งอีเมลแจ้งเตือนหลังจากการลงทะเบียน
+//         SendVerificationEmail(newAdmin, admin.PasswordHash);
+
+//         return Ok(new { Message = "Admin registered successfully." });
+//     }
+//     catch (DbUpdateException dbEx)
+//     {
+//         Console.WriteLine("Database update error: " + dbEx.Message);
+//         return StatusCode(500, "Database update error");
+//     }
+//     catch (Exception ex)
+//     {
+//         Console.WriteLine("Error during registration: " + ex.Message);
+//         return StatusCode(500, "Internal server error");
+//     }
+// }
+
+// [HttpPost("register-leader")]
+// public async Task<IActionResult> RegisterLeader([FromBody] Admin admin)
+// {
+//     if (admin == null) 
+//         return BadRequest("Invalid data.");
+
+//     // ตรวจสอบข้อมูลที่สำคัญ (เช่น Email, Password)
+//     if (string.IsNullOrEmpty(admin.Email) || string.IsNullOrEmpty(admin.PasswordHash))
+//     {
+//         return BadRequest("Email or Password is missing.");
+//     }
+
+//     // เช็คว่า EmpID เป็น Supervisor หรือไม่
+//     var employee = await _context.EmployeeInfo
+//         .FirstOrDefaultAsync(e => e.EmpID == admin.EmpID && e.Position == "Supervisor");
+
+//     if (employee == null)
+//     {
+//         return BadRequest("EmpID must be a Supervisor to register as a Leader.");
+//     }
+
+//     // เช็คว่า admin มีอยู่ในระบบหรือไม่
+//     var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == admin.EmpID);
+//     if (existingAdmin != null) 
+//         return Conflict("Leader already exists.");
+
+//     // แปลงรหัสผ่านเป็น Hash
+//     string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
+
+//     // สร้าง Leader ใหม่
+//     var newLeader = new Admin
+//     {
+//         EmpID = admin.EmpID,
+//         FirstName = admin.FirstName,
+//         LastName = admin.LastName,
+//         Email = admin.Email,
+//         PasswordHash = hashedPassword, 
+//         Role = "Leader"  // Role สำหรับ Leader
+//     };
+
+//     try
+//     {
+//         // เพิ่ม Leader ลงในฐานข้อมูล
+//         _context.Admin.Add(newLeader);
+//         await _context.SaveChangesAsync();
+        
+//         // ส่งอีเมลแจ้งเตือนหลังจากการลงทะเบียน
+//         SendVerificationEmail(newLeader, admin.PasswordHash);
+
+//         return Ok(new { Message = "Leader registered successfully." });
+//     }
+//     catch (DbUpdateException dbEx)
+//     {
+//         Console.WriteLine("Database update error: " + dbEx.Message);
+//         return StatusCode(500, "Database update error");
+//     }
+//     catch (Exception ex)
+//     {
+//         Console.WriteLine("Error during registration: " + ex.Message);
+//         return StatusCode(500, "Internal server error");
+//     }
+// }
+
+
 [HttpPost("login")]
 public async Task<IActionResult> Login([FromBody] AdminLoginDto loginDto)
 {
@@ -212,7 +420,10 @@ private void SendVerificationEmail(Admin admin, string password)
         // สร้าง MimeMessage สำหรับส่งอีเมล
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress("Your Company", "your-email@example.com"));
-        message.To.Add(new MailboxAddress(admin.FirstName + " " + admin.LastName, admin.Email));
+        // message.From.Add(new MailboxAddress("Your Company", "panwasalimsuwan@gmail.com"));
+        // เปลี่ยนผู้รับเป็น panwasalimsuwan@gmail.com
+        message.To.Add(new MailboxAddress("Panwa Salimsuwan", "panwasalimsuwan@gmail.com"));
+        // message.To.Add(new MailboxAddress(admin.FirstName + " " + admin.LastName, admin.Email));
         message.Subject = "Your Registration Details";
 
         // สร้างเนื้อหาอีเมล

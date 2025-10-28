@@ -30,7 +30,7 @@
           <td>{{ employee.lastName }}</td>
           <td>{{ employee.email }}</td>
           <td>
-          <button @click="registerLeader(employee)">Register</button>
+          <button @click="registerAdmin(employee)">Register</button>
             <button @click="editEmployee(employee)">Edit</button>
             <button @click="deleteEmployee(employee.empID)">Delete</button>
           </td>
@@ -50,19 +50,18 @@ import axios from 'axios';
 
 const employees = ref([]);
 
-// ฟังก์ชันดึงข้อมูลพนักงานจาก API
-const getSupervisors = async () => {
+const getTechnicians = async () => {
   try {
-    const response = await axios.get('http://localhost:5000/api/EmployeeInfo/get-supervisors');
-    console.log('Supervisors data:', response.data);
+    const response = await axios.get('http://localhost:5000/api/EmployeeInfo/get-technicians');
+    console.log('Technicians data:', response.data);
 
     if (response.data && response.data.length > 0) {
       employees.value = response.data;
     } else {
-      console.error("No supervisors found or invalid data");
+      console.error("No technicians found or invalid data");
     }
   } catch (error) {
-    console.error('Error fetching supervisors', error);
+    console.error('Error fetching technicians', error);
   }
 };
 
@@ -76,8 +75,7 @@ const generateRandomPassword = (length = 8) => {
   return password;
 };
 
-//ฟังก์ชันการลงทะเบียนพนักงาน
-const registerLeader = async (employee) => {
+const registerAdmin = async (employee) => {
   if (!employee || !employee.empID) {
     console.error("empID is undefined or invalid!");
     alert("Invalid employee data.");
@@ -91,18 +89,21 @@ const registerLeader = async (employee) => {
     return;
   }
 
-   // สุ่มรหัสผ่าน
-  const defaultPassword = generateRandomPassword(12);  // ความยาวรหัสผ่านเป็น 12 ตัวอักษร
+//   const defaultPassword = "defaultpassword";  // หรือสามารถให้ admin ระบุรหัสผ่าน
+
+//   console.log(`Registering employee with empID: ${employee.empID}`);
+
+const defaultPassword = generateRandomPassword(12);  // ความยาวรหัสผ่านเป็น 12 ตัวอักษร
   console.log(`Generated Password: ${defaultPassword}`);
 
   try {
-    const response = await axios.post('http://localhost:5000/api/admin/register-leader', {
+    const response = await axios.post('http://localhost:5000/api/admin/register-admin', {
       EmpID: employee.empID,
       FirstName: employee.firstName,
       LastName: employee.lastName,
       Email: employee.email,
       PasswordHash: defaultPassword,
-      Role: "Leader"
+      Role: "Admin"
     });
 
     console.log("Registration Response:", response.data);
@@ -115,11 +116,6 @@ const registerLeader = async (employee) => {
     alert('Error during registration.');
   }
 };
-
-
-//   const defaultPassword = "defaultpassword";  // หรือสามารถให้ admin ระบุรหัสผ่าน
-
-//   console.log(`Registering employee with empID: ${employee.empID}`);
 
 // ฟังก์ชันการแก้ไขพนักงาน
 const editEmployee = async (employee) => {
@@ -166,6 +162,7 @@ const deleteEmployee = async (empID) => {
 
 // เรียกฟังก์ชันเมื่อ component ถูก mount
 onMounted(() => {
-  getSupervisors();
+//   getSupervisors();
+  getTechnicians();
 });
 </script>

@@ -73,13 +73,14 @@ function getToken() {
 // login function
 async function doLogin({ email, password }) {
   const { data } = await axios.post(`${API_BASE_URL}/api/Admin/login`, {
-    Email: email,   // ใช้ Email แทน Username
-    Password: password,  // ส่งรหัสผ่านธรรมดา
+    Email: email,
+    Password: password,
   });
-
   if (!data?.token) throw new Error("ไม่พบโทเคนจากระบบ");
   setToken(data.token);
-  return data;
+  // เก็บ role ไว้ใช้ต่อ
+  if (data.role) localStorage.setItem("role", data.role);
+  return data; // { token, role, ... }
 }
 
 // ====== State ======
@@ -106,16 +107,21 @@ async function onSubmit() {
     error.value = "กรุณากรอกข้อมูลทั้งหมด";
     return;
   }
-
   try {
     loading.value = true;
-    const { token } = await doLogin({
-      email: email.value,  // ใช้ email
+    const { token, role } = await doLogin({
+      email: email.value,
       password: password.value,
     });
 
     setToken(token);
-    router.push("/dashboard");
+
+    // ✅ ใช้ role จาก response (ไม่ใช่ตัวแปรลอย ๆ)
+    if (role === "Admin") {
+      router.push("/dashboard-admin");
+    } else {
+      router.push("/dashboard");
+    }
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || "เข้าสู่ระบบไม่สำเร็จ";
   } finally {

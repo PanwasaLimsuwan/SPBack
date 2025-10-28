@@ -5,14 +5,18 @@ import DashboardMFG from './views/DashboardMFG.vue';
 import DashboardHR from './views/DashboardHR.vue';
 import AdminDashboard from './views/AdminDashboard.vue';
 import CamerasList from './components/CamerasList.vue';
-import Login from './views/Login.vue';
+import LeaderLogin from './views/LeaderLogin.vue';
+import RegisterLeader from './components/RegisterLeader'
+import RegisterAdmin from './components/RegisterAdmin'
 
 const routes = [
-  { path: "/", name: "login", component: Login, meta: { guestOnly: true } },
+  { path: "/", name: "Leaderlogin", component: LeaderLogin, meta: { guestOnly: true } },
   { path: '/dashboard', component: HomeDashboard },
   { path: '/dashboard-mfg', component: DashboardMFG },
   { path: '/dashboard-hr', component: DashboardHR },
   { path: '/dashboard-admin' , component: AdminDashboard },
+  { path: '/register-leader' , component: RegisterLeader },
+  { path: '/register-admin' , component: RegisterAdmin }
   // { path: '/cameras' , component: CamerasList },
 ];
 

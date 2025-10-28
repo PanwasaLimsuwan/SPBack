@@ -20,6 +20,7 @@ const emit = defineEmits(['clear-employee']);
 onMounted(async () => {
   try {
     const response = await axios.get("http://localhost:5000/api/GateEntry");
+        // const response = await axios.get("http://localhost:5000/api/FaceEntry");
     employees.value = response.data;
     filteredEmployees.value = response.data;
   } catch (error) {

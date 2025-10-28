@@ -1,7 +1,19 @@
 <template>
   <div>
     <h1>Admin Dashboard</h1>
-    <table>
+    
+    <!-- ฟอร์มการลงทะเบียน Admin -->
+    <!-- <form @submit.prevent="registerAdmin">
+      <h2>Register Admin</h2>
+      <input v-model="admin.firstName" placeholder="First Name" required />
+      <input v-model="admin.lastName" placeholder="Last Name" required />
+      <input v-model="admin.email" type="email" placeholder="Email" required />
+      <input v-model="admin.password" type="password" placeholder="Password" required />
+      <button type="submit">Register Admin</button>
+    </form> -->
+
+    <!-- ตารางแสดงข้อมูลพนักงาน -->
+    <table v-if="employees.length > 0">
       <thead>
         <tr>
           <th>EmpID</th>
@@ -11,27 +23,26 @@
           <th>Action</th>
         </tr>
       </thead>
-      <tbody v-if="employees.length > 0">
+      <tbody>
         <tr v-for="employee in employees" :key="employee.empID">
           <td>{{ employee.empID }}</td>
           <td>{{ employee.firstName }}</td>
           <td>{{ employee.lastName }}</td>
           <td>{{ employee.email }}</td>
           <td>
-            <button @click="registerEmployee(employee)">Register</button>
+          <button @click="registerLeader(employee)">Register</button>
             <button @click="editEmployee(employee)">Edit</button>
             <button @click="deleteEmployee(employee.empID)">Delete</button>
           </td>
         </tr>
       </tbody>
-      <tbody v-else>
-        <tr>
-          <td colspan="5">ไม่พบข้อมูล</td>
-        </tr>
-      </tbody>
     </table>
+    <div v-else>
+      <p>No employees found.</p>
+    </div>
   </div>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue';
@@ -55,8 +66,18 @@ const getSupervisors = async () => {
   }
 };
 
-// ฟังก์ชันการลงทะเบียนพนักงาน
-const registerEmployee = async (employee) => {
+const generateRandomPassword = (length = 8) => {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    password += characters[randomIndex];
+  }
+  return password;
+};
+
+//ฟังก์ชันการลงทะเบียนพนักงาน
+const registerLeader = async (employee) => {
   if (!employee || !employee.empID) {
     console.error("empID is undefined or invalid!");
     alert("Invalid employee data.");
@@ -70,12 +91,12 @@ const registerEmployee = async (employee) => {
     return;
   }
 
-  const defaultPassword = "defaultpassword";  // หรือสามารถให้ admin ระบุรหัสผ่าน
-
-  console.log(`Registering employee with empID: ${employee.empID}`);
+   // สุ่มรหัสผ่าน
+  const defaultPassword = generateRandomPassword(12);  // ความยาวรหัสผ่านเป็น 12 ตัวอักษร
+  console.log(`Generated Password: ${defaultPassword}`);
 
   try {
-    const response = await axios.post('http://localhost:5000/api/admin/register', {
+    const response = await axios.post('http://localhost:5000/api/admin/register-leader', {
       EmpID: employee.empID,
       FirstName: employee.firstName,
       LastName: employee.lastName,
@@ -94,6 +115,11 @@ const registerEmployee = async (employee) => {
     alert('Error during registration.');
   }
 };
+
+
+//   const defaultPassword = "defaultpassword";  // หรือสามารถให้ admin ระบุรหัสผ่าน
+
+//   console.log(`Registering employee with empID: ${employee.empID}`);
 
 // ฟังก์ชันการแก้ไขพนักงาน
 const editEmployee = async (employee) => {

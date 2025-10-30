@@ -25,10 +25,8 @@ namespace Api.Models
         [EmailAddress]
         public string Email { get; set; }
 
-        [Required]
-        public string PasswordHash { get; set; }
-
-        [Required]
-        public string Role { get; set; }
+        // เปลี่ยนให้เป็น Nullable
+    public string? Role { get; set; } // หรือใช้ string? ถ้าคุณต้องการให้เป็น null ได้
+    public string? PasswordHash { get; set; } // หรือใช้ string? ถ้าคุณต้องการให้เป็น null ได้
     }
 }

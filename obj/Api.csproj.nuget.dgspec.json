@@ -49,7 +49,7 @@
             },
             "Dapper": {
               "target": "Package",
-              "version": "[2.1.24, )"
+              "version": "[2.0.35, )"
             },
             "MailKit": {
               "target": "Package",

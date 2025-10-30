@@ -54,5 +54,8 @@ namespace Api.Models
         public DbSet<Admin> Admin { get; set; }
 
         // public DbSet<Cameras> Cameras { get; set; } // 👈 เพิ่มตรงนี้!
+
+        // DbSet สำหรับการจัดการข้อมูล Admin
+        public DbSet<Widget> Widget { get; set; }
     }
 }

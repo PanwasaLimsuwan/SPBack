@@ -21,7 +21,7 @@
     <!-- Other dependencies -->
     <PackageReference Include="System.Data.SqlClient" Version="4.8.4" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.2" />
-    <PackageReference Include="Dapper" Version="2.1.24" />
+    <PackageReference Include="Dapper" Version="2.0.35" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
 

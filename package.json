@@ -12,6 +12,7 @@
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
+    "jwt-decode": "^3.1.2",
     "plotly.js": "^2.35.2",
     "sortablejs": "^1.15.6",
     "stream-browserify": "^3.0.0",

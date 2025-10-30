@@ -20,11 +20,11 @@ const rows = ref([]);
 const title = ref('');
 
 const presets = [
-  { key: 'skill-gaps',      label: 'Skill gaps by process' },
-  { key: 'ot-hotspots',     label: 'OT hotspots (last N weeks)' },
+  { key: 'skill-gaps', label: 'Skill gaps by process' },
+  { key: 'ot-hotspots', label: 'OT hotspots (last N weeks)' },
   { key: 'headcount-vs-plan', label: 'Headcount vs plan variance' },
   { key: 'absence-streaks', label: 'Consecutive absence (>=2 days)' },
-  { key: 'eicc-risk',       label: 'EICC risk (hours)' },
+  { key: 'eicc-risk', label: 'EICC risk (hours)' },
 ];
 
 async function run() {
@@ -44,12 +44,14 @@ async function run() {
     const res = await api.post('/Analytics/run', body);
     title.value = res.data.title;
     rows.value = Array.isArray(res.data.data) ? res.data.data : [];
+  } catch (error) {
+    console.error('API Error:', error.response ? error.response.data : error.message);
+    title.value = "Error: Unable to fetch data";
   } finally {
     loading.value = false;
   }
 }
 
-// auto-run เมื่อฟิลเตอร์เปลี่ยน
 watch(() => ({...props.filters}), () => run(), { deep:true, immediate:true });
 </script>
 

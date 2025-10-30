@@ -5,6 +5,7 @@ import router from './router';
 import Toast from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
 import axios from 'axios';
+import Logout from '../src/views/Logout'
 
 // ตั้งค่า base URL สำหรับทุกคำขอของ Axios
 axios.defaults.baseURL = 'http://localhost:5000';  // ตั้งค่า base URL ไปที่ Backend API ของคุณ
@@ -13,6 +14,8 @@ axios.defaults.baseURL = 'http://localhost:5000';  // ตั้งค่า base
 export { axios };
 
 const app = createApp(App);
+app.component("Logout", Logout);  // ลงทะเบียน LogoutButton เป็น global component
+
 app.use(router);
 app.use(Toast);
 app.mount('#app');

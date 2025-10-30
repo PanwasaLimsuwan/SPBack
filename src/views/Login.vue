@@ -116,12 +116,12 @@ async function onSubmit() {
 
     setToken(token);
 
-    // ✅ ใช้ role จาก response (ไม่ใช่ตัวแปรลอย ๆ)
+    // ✅ ตรวจสอบ role ที่ได้รับจาก API response
     if (role === "Admin") {
       router.push("/dashboard-admin");
-    } else {
+    } else if (role === "Leader") {
       router.push("/dashboard");
-    }
+    } 
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || "เข้าสู่ระบบไม่สำเร็จ";
   } finally {

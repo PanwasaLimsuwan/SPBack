@@ -14,6 +14,7 @@ import EmployeeHeadcount from "./../components/EmployeeHeadcount.vue";
 import TrainingEmployee from "./../components/TrainingEmployee.vue";
 import EmployeeHeadcountHR from "@/components/EmployeeHeadcountHR.vue";
 import StatusTabHR from "@/components/StatusTabHR.vue";
+import Logout from "../views/Logout";
 
 // ✅ ตัวแปรหลัก
 const employees = ref([]);
@@ -132,6 +133,7 @@ const selectEmployee = (employee) => {
         </a>
         <h1>Real time monitoring dashboard for leader allocation</h1>
         <h1 style="color: red">For HR</h1>
+        <Logout />
       </div>
       <div class="filters">
         <select v-model="filters.division">

@@ -1,19 +1,9 @@
 <template>
-  <div>
-    <h1>Admin Dashboard</h1>
-    
-    <!-- ฟอร์มการลงทะเบียน Admin -->
-    <!-- <form @submit.prevent="registerAdmin">
-      <h2>Register Admin</h2>
-      <input v-model="admin.firstName" placeholder="First Name" required />
-      <input v-model="admin.lastName" placeholder="Last Name" required />
-      <input v-model="admin.email" type="email" placeholder="Email" required />
-      <input v-model="admin.password" type="password" placeholder="Password" required />
-      <button type="submit">Register Admin</button>
-    </form> -->
+  <div class="dashboard-container">
+    <h1 class="header">Manage Admin <Logout /></h1>
 
     <!-- ตารางแสดงข้อมูลพนักงาน -->
-    <table v-if="employees.length > 0">
+    <table v-if="employees.length > 0" class="employee-table">
       <thead>
         <tr>
           <th>EmpID</th>
@@ -30,43 +20,103 @@
           <td>{{ employee.lastName }}</td>
           <td>{{ employee.email }}</td>
           <td>
-          <button @click="registerAdmin(employee)">Register</button>
-            <button @click="editEmployee(employee)">Edit</button>
-            <button @click="deleteEmployee(employee.empID)">Delete</button>
+            <!-- ปุ่ม Register, Edit, Delete -->
+            <button 
+              class="btn-register" 
+              :disabled="employee.isRegistered" 
+              @click="registerAdmin(employee)">
+              {{ employee.isRegistered ? 'Registered' : 'Register' }}
+            </button>
+            <button class="btn-edit" @click="openEditForm(employee)">Edit</button>
+            <button class="btn-delete" @click="deleteEmployee(employee.empID)">Delete</button>
           </td>
         </tr>
       </tbody>
     </table>
+
     <div v-else>
-      <p>No employees found.</p>
+      <p class="no-employees">No employees found.</p>
+    </div>
+
+    <!-- ฟอร์มแก้ไขข้อมูล (Pop-up) -->
+    <div v-if="isEditFormVisible" class="edit-form-overlay">
+      <div class="edit-form-container">
+        <h3>Edit Employee</h3>
+        <form @submit.prevent="editEmployee">
+          <label>EmpID:</label>
+          <input type="text" v-model="editData.empID" readonly />
+          
+          <label>First Name:</label>
+          <input type="text" v-model="editData.firstName" required />
+          
+          <label>Last Name:</label>
+          <input type="text" v-model="editData.lastName" required />
+          
+          <label>Email:</label>
+          <input type="email" v-model="editData.email" required />
+
+          <button type="submit">Save Changes</button>
+          <button type="button" @click="closeEditForm">Cancel</button>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
-
 <script setup>
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
+import { ref, onMounted } from "vue";
+import axios from "axios";
+import Logout from "../views/Logout";
 
 const employees = ref([]);
+const isEditFormVisible = ref(false);
+const editData = ref({
+  empID: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  role: 'Admin',
+});
+
+// const getTechnicians = async () => {
+//   try {
+//     const response = await axios.get('http://localhost:5000/api/EmployeeInfo/get-technicians');
+//     if (response.data && response.data.length > 0) {
+//       employees.value = response.data;
+//     }
+//   } catch (error) {
+//     console.error('Error fetching technicians', error);
+//   }
+// };
 
 const getTechnicians = async () => {
   try {
-    const response = await axios.get('http://localhost:5000/api/EmployeeInfo/get-technicians');
-    console.log('Technicians data:', response.data);
-
+    const response = await axios.get(
+      "http://localhost:5000/api/EmployeeInfo/get-technicians"
+    );
     if (response.data && response.data.length > 0) {
-      employees.value = response.data;
+      // ตรวจสอบว่าพนักงานแต่ละคนลงทะเบียนแล้วหรือยัง
+      employees.value = response.data.map((employee) => ({
+        ...employee,
+        isRegistered: false, // เริ่มต้นให้ไม่มีการลงทะเบียน
+      }));
+
+      // ตรวจสอบการลงทะเบียนใน API
+      for (const employee of employees.value) {
+        const isRegisteredResponse = await checkIfRegistered(employee.empID);
+        employee.isRegistered = isRegisteredResponse.isRegistered;
+      }
     } else {
-      console.error("No technicians found or invalid data");
+      console.error("No supervisors found or invalid data");
     }
   } catch (error) {
-    console.error('Error fetching technicians', error);
+    console.error("Error fetching supervisors", error);
   }
 };
 
 const generateRandomPassword = (length = 8) => {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
   let password = "";
   for (let i = 0; i < length; i++) {
     const randomIndex = Math.floor(Math.random() * characters.length);
@@ -75,72 +125,124 @@ const generateRandomPassword = (length = 8) => {
   return password;
 };
 
+// ฟังก์ชันตรวจสอบว่าพนักงานได้ลงทะเบียนหรือยัง
+const checkIfRegistered = async (empID) => {
+  try {
+    const response = await axios.get(
+      `http://localhost:5000/api/admin/check-registration-admin?empID=${empID}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error checking registration:", error);
+    return { isRegistered: false };
+  }
+};
+
+// เปิดฟอร์มแก้ไข
+const openEditForm = (employee) => {
+  editData.value = { ...employee }; // คัดลอกข้อมูลพนักงานที่ต้องการแก้ไข
+  if (!editData.value.empID) {
+    alert("Invalid employee data!");
+    return;
+  }
+  isEditFormVisible.value = true;
+};
+
+// ปิดฟอร์มแก้ไข
+const closeEditForm = () => {
+  isEditFormVisible.value = false;
+};
+
 const registerAdmin = async (employee) => {
   if (!employee || !employee.empID) {
     console.error("empID is undefined or invalid!");
     alert("Invalid employee data.");
     return;
   }
-
-  // ตรวจสอบว่า firstName, lastName และ email มีค่าหรือไม่
   if (!employee.firstName || !employee.lastName || !employee.email) {
     console.error("Incomplete employee data!");
     alert("Please complete the employee data.");
     return;
   }
 
-//   const defaultPassword = "defaultpassword";  // หรือสามารถให้ admin ระบุรหัสผ่าน
-
-//   console.log(`Registering employee with empID: ${employee.empID}`);
-
-const defaultPassword = generateRandomPassword(12);  // ความยาวรหัสผ่านเป็น 12 ตัวอักษร
-  console.log(`Generated Password: ${defaultPassword}`);
-
+  const defaultPassword = generateRandomPassword(12);
   try {
-    const response = await axios.post('http://localhost:5000/api/admin/register-admin', {
+    const response = await axios.post("http://localhost:5000/api/admin/register-admin", {
       EmpID: employee.empID,
       FirstName: employee.firstName,
       LastName: employee.lastName,
       Email: employee.email,
       PasswordHash: defaultPassword,
-      Role: "Admin"
+      Role: "Admin",
     });
-
-    console.log("Registration Response:", response.data);
     if (response.status === 200) {
-      alert('Employee registered successfully.');
-      getSupervisors();  // รีเฟรชข้อมูลพนักงานหลังจากการลงทะเบียน
+      alert("Employee registered successfully.");
+      getTechnicians(); // รีเฟรชข้อมูลพนักงานหลังจากการลงทะเบียน
     }
   } catch (error) {
     console.error("Error during registration:", error);
-    alert('Error during registration.');
+    alert("Error during registration.");
   }
 };
 
 // ฟังก์ชันการแก้ไขพนักงาน
 const editEmployee = async (employee) => {
+  if (!editData.value.empID) {
+    console.error("empID is undefined or invalid!");
+    alert("Invalid EmpID.");
+    return;
+  }
+
   const updatedData = {
-    EmpID: employee.empID,
-    FirstName: employee.firstName,
-    LastName: employee.lastName,
-    Email: employee.email,
-    Role: "Leader"  // หรือ role ที่ต้องการแก้ไข
+    EmpID: editData.value.empID,  // ส่ง empID ไปด้วยใน body
   };
 
+  // ตรวจสอบการเปลี่ยนแปลงของฟิลด์ firstName
+  if (editData.value.firstName !== employee.firstName) {
+    updatedData.FirstName = editData.value.firstName;
+  }
+
+  // ตรวจสอบการเปลี่ยนแปลงของฟิลด์ lastName
+  if (editData.value.lastName !== employee.lastName) {
+    updatedData.LastName = editData.value.lastName;
+  }
+
+  // ตรวจสอบการเปลี่ยนแปลงของฟิลด์ email
+  if (editData.value.email !== employee.email) {
+    updatedData.Email = editData.value.email;
+  }
+
+  // ตรวจสอบว่ามีการเปลี่ยนแปลงใด ๆ หรือไม่
+  if (Object.keys(updatedData).length === 1) {  // เช็คเฉพาะการเปลี่ยนแปลง (empID จะอยู่ใน updatedData เสมอ)
+    alert("No changes detected.");
+    return;
+  }
+
+  console.log("Sending data with empID:", updatedData.EmpID);
+  console.log("Updated data:", updatedData);
+
   try {
-    const response = await axios.put(`http://localhost:5000/api/admin/edit/${employee.empID}`, updatedData);
-    console.log("Edit Response:", response.data);
+    const response = await axios.put(
+      `http://localhost:5000/api/admin/edit/${updatedData.EmpID}`,  // ใช้ URL ปกติไม่ต้องใส่ empID ใน URL
+      updatedData,  // ส่งข้อมูลทั้งหมดรวมทั้ง empID ใน body
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     if (response.status === 200) {
-      alert('Employee updated successfully.');
-      getSupervisors();  // รีเฟรชข้อมูลพนักงานหลังจากการแก้ไข
+      alert("Employee updated successfully.");
+      // getSupervisors();  // รีเฟรชข้อมูลพนักงานหลังจากการแก้ไข
+      getTechnicians()
+      closeEditForm();  // ปิดฟอร์มแก้ไข
     }
   } catch (error) {
     console.error("Error during edit:", error);
-    alert('Error during edit.');
+    alert("Error during edit. " + (error.response?.data || error.message));  // แสดงข้อความจากเซิร์ฟเวอร์
   }
 };
 
-// ฟังก์ชันการลบพนักงาน
 const deleteEmployee = async (empID) => {
   if (!empID) {
     console.error("Invalid EmpID!");
@@ -149,10 +251,10 @@ const deleteEmployee = async (empID) => {
 
   try {
     const response = await axios.delete(`http://localhost:5000/api/admin/delete/${empID}`);
-    console.log("Delete Response:", response.data);
     if (response.status === 200) {
       alert('Employee deleted successfully.');
-      getSupervisors();  // รีเฟรชข้อมูลพนักงานหลังจากการลบ
+      // getSupervisors();  // รีเฟรชข้อมูลพนักงานหลังจากการลบ
+      getTechnicians();
     }
   } catch (error) {
     console.error("Error during delete:", error);
@@ -160,9 +262,142 @@ const deleteEmployee = async (empID) => {
   }
 };
 
-// เรียกฟังก์ชันเมื่อ component ถูก mount
 onMounted(() => {
-//   getSupervisors();
   getTechnicians();
 });
 </script>
+
+<style scoped>
+.dashboard-container {
+  padding: 20px;
+  font-family: 'Arial', sans-serif;
+}
+
+.header {
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.employee-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.employee-table th, .employee-table td {
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #ddd;
+}
+
+.employee-table th {
+  background-color: #f4f4f4;
+}
+
+.employee-table tr:hover {
+  background-color: #f1f1f1;
+}
+
+button {
+  margin: 5px;
+  padding: 8px 16px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.btn-register {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.btn-register:hover {
+  background-color: #45a049;
+}
+
+.btn-register:disabled {
+  background-color: #dcdcdc;
+  cursor: not-allowed;
+}
+
+.btn-edit {
+  background-color: #f9a825;
+  color: white;
+}
+
+.btn-edit:hover {
+  background-color: #f57f17;
+}
+
+.btn-delete {
+  background-color: #e53935;
+  color: white;
+}
+
+.btn-delete:hover {
+  background-color: #d32f2f;
+}
+
+.no-employees {
+  text-align: center;
+  color: #666;
+  font-size: 18px;
+}
+
+/* ฟอร์ม Pop-up */
+.edit-form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.edit-form-container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-form-container h3 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.edit-form-container label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.edit-form-container input,
+.edit-form-container select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.edit-form-container button {
+  padding: 10px;
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  background-color: #4CAF50;
+  color: white;
+  cursor: pointer;
+}
+
+.edit-form-container button[type="button"] {
+  background-color: #f44336;
+  margin-top: 5px;
+}
+</style>

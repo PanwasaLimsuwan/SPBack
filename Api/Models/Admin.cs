@@ -1,41 +1,32 @@
-// using System;
-// using System.ComponentModel.DataAnnotations;
-// // using System.ComponentModel.DataAnnotations.Schema;
-// // using System.Text.Json.Serialization;
-
-// namespace Api.Models
-// {
-//     public class Admin
-//     {
-//         public int user_id { get; set; }
-//         public string Username { get; set; }
-//         // public string Password { get; set; } // รหัสผ่านที่ไม่แฮช
-//         public string PasswordHash { get; set; } // รหัสผ่านที่แฮชแล้ว
-//         // public string Role { get; set; } // เช่น 'superadmin', 'admin'
-
-//         // [NotMapped] // ไม่สร้าง column ใน DB
-//         // [JsonPropertyName("password")]
-//         // public string Password { get; set; }  // ใช้รับ input ชั่วคราว
-//     }
-// }
-
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Api.Models
 {
-    [Table("Admin")] // กันเหนียวว่าแมพไปที่ตารางชื่อ Admin แน่ๆ
+    [Table("Admin")] // กำหนดชื่อของตารางเป็น "Admin"
     public class Admin
     {
-        [Key]
+        [Key] // Primary Key
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // ใช้ Auto Increment สำหรับ user_id
         [Column("user_id")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int user_id { get; set; }
+        public int user_id { get; set; } // user_id จะเป็น PK และ Auto Increment
+
+        [Required] // ฟิลด์ EmpID ที่จำเป็นต้องกรอก
+        public int EmpID { get; set; }
 
         [Required]
-        public string Username { get; set; }
+        public string FirstName { get; set; }
 
         [Required]
-        public string PasswordHash { get; set; }
+        public string LastName { get; set; }
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        // เปลี่ยนให้เป็น Nullable
+    public string? Role { get; set; } // หรือใช้ string? ถ้าคุณต้องการให้เป็น null ได้
+    public string? PasswordHash { get; set; } // หรือใช้ string? ถ้าคุณต้องการให้เป็น null ได้
     }
 }

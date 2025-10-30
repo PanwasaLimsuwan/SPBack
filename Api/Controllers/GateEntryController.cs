@@ -6,17 +6,17 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class FaceVectorController : ControllerBase
+    public class GateEntryController : ControllerBase
     {
         private readonly IConfiguration _configuration;
 
-        public FaceVectorController(IConfiguration configuration)
+        public GateEntryController(IConfiguration configuration)
         {
             _configuration = configuration;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetFaceVector(
+        public async Task<IActionResult> GetGateEntry(
             [FromQuery] string? division,
             [FromQuery] string? department,
             [FromQuery] string? section,
@@ -27,12 +27,16 @@ namespace Api.Controllers
         {
             var result = new List<object>();
 
-            using (var conn = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            using (
+                var conn = new SqlConnection(
+                    _configuration.GetConnectionString("DefaultConnection")
+                )
+            )
             {
                 await conn.OpenAsync();
 
-                // 1️⃣ ถ้าไม่เลือกวัน ให้ใช้วันล่าสุดใน FaceVector
                 DateTime selectedDate;
+
                 if (date.HasValue)
                 {
                     selectedDate = date.Value;
@@ -40,7 +44,7 @@ namespace Api.Controllers
                 else
                 {
                     var latestDateCmd = new SqlCommand(
-                        "SELECT TOP 1 [Timestamp] FROM FaceVector ORDER BY [Timestamp] DESC",
+                        "SELECT TOP 1 EntryDateTime FROM GateEntry WHERE EntryDateTime IS NOT NULL ORDER BY EntryDateTime DESC",
                         conn
                     );
                     var latestDateObj = await latestDateCmd.ExecuteScalarAsync();
@@ -54,39 +58,40 @@ namespace Api.Controllers
                 }
 
                 DateTime dateStart = selectedDate.Date;
+                // DateTime dateEnd = selectedDate.Date.AddDays(1).AddSeconds(-1);
                 DateTime dateEnd = selectedDate.Date.AddDays(1).AddHours(7).AddSeconds(-1); // ครอบคลุมเวลาออกกะ 07:00 ของวันถัดไป
 
-                // 2️⃣ Query หลัก: ดึงข้อมูล FaceVector ล่าสุดต่อพนักงาน
-                var query = @"
-                    WITH LatestFaceVector AS (
+                var query =
+                    @"
+                    WITH RankedGateEntry AS (
                         SELECT 
-                            fv.FaceVectorID,
-                            fv.EmpID,
-                            fv.Vector,
-                            fv.[Timestamp],
-                            e.FirstName,
-                            e.LastName,
-                            e.Division,
-                            e.Department,
-                            e.Section,
-                            e.Position,
-                            e.Email,
-                            e.ShiftCode,
-                            e.Biz,
-                            e.Process,
-                            ROW_NUMBER() OVER (PARTITION BY fv.EmpID ORDER BY fv.[Timestamp] DESC) AS rn
-                        FROM FaceVector fv
-                        JOIN EmployeeInfo e ON fv.EmpID = e.EmpID
-                        WHERE fv.[Timestamp] BETWEEN @dateStart AND @dateEnd
+                            g.EmpID,
+                            e.FirstName, e.LastName, e.Division, e.Department, 
+                            e.Position, e.Email, e.ShiftCode, e.Section,
+                            e.Biz, e.Process,
+                            g.EntryDateTime, g.ExitDateTime, g.GateNo, g.GateStatus,
+                            c.CStatus, c.CheckInDateTime, c.CheckOutDateTime,
+                            ROW_NUMBER() OVER (PARTITION BY g.EmpID ORDER BY g.EntryDateTime DESC) AS rn
+                        FROM GateEntry g
+                        JOIN EmployeeInfo e ON g.EmpID = e.EmpID
+                        OUTER APPLY (
+                            SELECT TOP 1 *
+                            FROM CleanroomEntry c
+                            WHERE c.EmpID = g.EmpID
+                            ORDER BY c.CheckInDateTime DESC
+                        ) c
+                        WHERE (
+                            g.EntryDateTime BETWEEN @dateStart AND @dateEnd
+                            OR g.ExitDateTime BETWEEN @dateStart AND @dateEnd
+                            OR (g.EntryDateTime <= @dateStart AND g.ExitDateTime >= @dateEnd)
+                        )
                         AND (@division IS NULL OR e.Division = @division)
                         AND (@department IS NULL OR e.Department = @department)
                         AND (@section IS NULL OR e.Section = @section)
                         AND (@biz IS NULL OR COALESCE(e.Biz, '') = @biz)
                         AND (@process IS NULL OR COALESCE(e.Process, '') = @process)
                     )
-                    SELECT * FROM LatestFaceVector WHERE rn = 1
-                    ORDER BY [Timestamp] DESC;
-                ";
+                    SELECT * FROM RankedGateEntry WHERE rn = 1";
 
                 using (var cmd = new SqlCommand(query, conn))
                 {
@@ -102,22 +107,83 @@ namespace Api.Controllers
                     {
                         while (await reader.ReadAsync())
                         {
-                            result.Add(new
+                            var empID = Convert.ToInt32(reader["EmpID"]);
+                            var gateStatus =
+                                reader["GateStatus"] == DBNull.Value
+                                    ? null
+                                    : reader["GateStatus"]?.ToString();
+                            var cStatus =
+                                reader["CStatus"] == DBNull.Value
+                                    ? null
+                                    : reader["CStatus"]?.ToString();
+
+                            DateTime? entryDateTime =
+                                reader["EntryDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["EntryDateTime"];
+                            DateTime? exitDateTime =
+                                reader["ExitDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["ExitDateTime"];
+                            DateTime? checkInDateTime =
+                                reader["CheckInDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["CheckInDateTime"];
+                            DateTime? checkOutDateTime =
+                                reader["CheckOutDateTime"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["CheckOutDateTime"];
+
+                            if (gateStatus == "IN")
                             {
-                                FaceVectorID = reader["FaceVectorID"],
-                                EmpID = reader["EmpID"],
-                                FirstName = reader["FirstName"]?.ToString(),
-                                LastName = reader["LastName"]?.ToString(),
-                                Division = reader["Division"]?.ToString(),
-                                Department = reader["Department"]?.ToString(),
-                                Section = reader["Section"]?.ToString(),
-                                Position = reader["Position"]?.ToString(),
-                                Email = reader["Email"]?.ToString(),
-                                ShiftCode = reader["ShiftCode"]?.ToString(),
-                                Biz = reader["Biz"]?.ToString(),
-                                Process = reader["Process"]?.ToString(),
-                                Timestamp = Convert.ToDateTime(reader["Timestamp"]).ToString("yyyy-MM-dd HH:mm:ss")
-                            });
+                                exitDateTime = null;
+                                checkOutDateTime = null;
+                            }
+                            else if (string.IsNullOrEmpty(gateStatus))
+                            {
+                                entryDateTime = null;
+                                exitDateTime = null;
+                                checkInDateTime = null;
+                                checkOutDateTime = null;
+                            }
+
+                            string status = (cStatus, gateStatus) switch
+                            {
+                                (null, null) => "status-missing",
+                                ("OUT", "IN") => "status-out-cleanroom",
+                                ("IN", "IN") => "status-in-cleanroom",
+                                ("OUT", "OUT") => "status-get-off",
+                                _ => "status-unknown",
+                            };
+
+                            result.Add(
+                                new
+                                {
+                                    EmpID = empID,
+                                    firstName = reader["FirstName"]?.ToString(),
+                                    lastName = reader["LastName"]?.ToString(),
+                                    division = reader["Division"]?.ToString(),
+                                    department = reader["Department"]?.ToString(),
+                                    position = reader["Position"]?.ToString(),
+                                    email = reader["Email"]?.ToString(),
+                                    shiftCode = reader["ShiftCode"]?.ToString(),
+                                    section = reader["Section"]?.ToString(),
+                                    entryDateTime = entryDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    exitDateTime = exitDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    gateNo = reader["GateNo"]?.ToString(),
+                                    gateStatus,
+                                    biz = reader["Biz"]?.ToString(),
+                                    process = reader["Process"]?.ToString(),
+                                    cStatus,
+                                    checkInDateTime = checkInDateTime?.ToString(
+                                        "yyyy-MM-dd HH:mm:ss"
+                                    ),
+                                    checkOutDateTime = checkOutDateTime?.ToString(
+                                        "yyyy-MM-dd HH:mm:ss"
+                                    ),
+                                    status,
+                                }
+                            );
                         }
                     }
                 }

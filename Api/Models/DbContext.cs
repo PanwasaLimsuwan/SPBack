@@ -32,6 +32,9 @@ namespace Api.Models
         // DbSet สำหรับการจัดการข้อมูล GateEntry
         public DbSet<GateEntry> GateEntry { get; set; }
 
+        // DbSet สำหรับการจัดการข้อมูล FaceEntry
+        public DbSet<FaceEntry> FaceEntry { get; set; }
+
         // DbSet สำหรับการจัดการข้อมูล Attendance
         public DbSet<Attendance> Attendance { get; set; }
 
@@ -51,5 +54,8 @@ namespace Api.Models
         public DbSet<Admin> Admin { get; set; }
 
         // public DbSet<Cameras> Cameras { get; set; } // 👈 เพิ่มตรงนี้!
+
+        // DbSet สำหรับการจัดการข้อมูล Admin
+        public DbSet<Widget> Widget { get; set; }
     }
 }

@@ -79,11 +79,15 @@ namespace Api.Controllers
                                     empID = reader.GetInt32(1),
                                     weekID = reader.GetInt32(2),
                                     monthYear = reader["MonthYear"]?.ToString(),
-                                    totalHours = reader.IsDBNull(4) ? (decimal?)null : Convert.ToDecimal(reader.GetValue(4)),
+                                    totalHours = reader.IsDBNull(4)
+                                        ? (decimal?)null
+                                        : Convert.ToDecimal(reader.GetValue(4)),
                                     daysWorked = reader.IsDBNull(5)
                                         ? null
                                         : (int?)reader.GetInt32(5),
-                                    totalOT    = reader.IsDBNull(6) ? (decimal?)null : Convert.ToDecimal(reader.GetValue(6)),
+                                    totalOT = reader.IsDBNull(6)
+                                        ? (decimal?)null
+                                        : Convert.ToDecimal(reader.GetValue(6)),
                                     status = reader["Status"]?.ToString(),
                                     division = reader["Division"]?.ToString(),
                                     department = reader["Department"]?.ToString(),
@@ -122,8 +126,8 @@ namespace Api.Controllers
                     @"
                     SELECT 
                         eicc.MonthYear,
-                        SUM(eicc.TotalOT) AS TotalOT,
-                        SUM(eicc.TotalHours) AS TotalHours,
+                        ISNULL(SUM(eicc.TotalOT), 0) AS TotalOT,
+                        ISNULL(SUM(eicc.TotalHours), 0) AS TotalHours,
                         COUNT(DISTINCT eicc.EmpID) AS EmployeeCount
                     FROM EICC_Control eicc
                     JOIN EmployeeInfo ei ON eicc.EmpID = ei.EmpID
@@ -157,6 +161,12 @@ namespace Api.Controllers
                     {
                         while (await reader.ReadAsync())
                         {
+                            var totalOT = reader.IsDBNull(1)
+                                ? 0.0
+                                : Convert.ToDouble(reader.GetValue(1));
+                            var totalHours = reader.IsDBNull(2)
+                                ? 0.0
+                                : Convert.ToDouble(reader.GetValue(2));
                             results.Add(
                                 new
                                 {
@@ -167,8 +177,10 @@ namespace Api.Controllers
                                     // totalHours = reader.IsDBNull(reader.GetOrdinal("TotalHours"))
                                     //     ? 0
                                     //     : Convert.ToDouble(reader["TotalHours"]),
-                                    totalOT    = reader.IsDBNull(1) ? 0m : reader.GetDecimal(1),
-        totalHours = reader.IsDBNull(2) ? 0m : reader.GetDecimal(2),
+                                    // totalOT = reader.IsDBNull(1) ? 0m : reader.GetDecimal(1),
+                                    // totalHours = reader.IsDBNull(2) ? 0m : reader.GetDecimal(2),
+                                    totalOT = Math.Round(totalOT, 2),
+                                    totalHours = Math.Round(totalHours, 2),
                                     employeeCount = Convert.ToInt32(reader["EmployeeCount"]),
                                 }
                             );

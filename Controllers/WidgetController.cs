@@ -41,71 +41,76 @@ namespace Api.Controllers
             }
         }
 
-[HttpPost("save-widget-settings")]
-public IActionResult SaveWidget([FromBody] WidgetDto settingsDto)
-{
-    if (settingsDto == null)
-    {
-        return BadRequest("Invalid settings data");
-    }
-
-    try
-    {
-        // ตรวจสอบว่า user_id มีอยู่ในตาราง Admin หรือไม่
-        var admin = _context.Admin.FirstOrDefault(a => a.user_id == settingsDto.user_id);
-        if (admin == null)
+        [HttpPost("save-widget-settings")]
+        public IActionResult SaveWidget([FromBody] WidgetDto settingsDto)
         {
-            return BadRequest("User ID not found in Admin table");
-        }
-
-        // ตรวจสอบว่า UserId ในฐานข้อมูลมีข้อมูล Widget หรือไม่
-        var existingSettings = _context.Widget.FirstOrDefault(ws => ws.user_id == settingsDto.user_id);
-        
-        if (existingSettings != null)
-        {
-            // ถ้ามีข้อมูลการตั้งค่าอยู่แล้ว ให้ทำการอัปเดต
-            existingSettings.settings = settingsDto.Settings;
-            _context.Widget.Update(existingSettings);
-        }
-        else
-        {
-            // ถ้ายังไม่มีข้อมูล ให้สร้างข้อมูลใหม่
-            var newSettings = new Widget
+            if (settingsDto == null)
             {
-                user_id = settingsDto.user_id,
-                settings = settingsDto.Settings,
-            };
-            _context.Widget.Add(newSettings);
-        }
+                return BadRequest("Invalid settings data");
+            }
 
-        // บันทึกการเปลี่ยนแปลง
-        _context.SaveChanges();
-        return Ok("Widget settings saved successfully");
-    }
-    catch (DbUpdateException ex)
-    {
-        return StatusCode(500, $"Database update failed: {ex.InnerException?.Message ?? ex.Message}");
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, $"An unexpected error occurred: {ex.Message}");
-    }
-}
+            try
+            {
+                // ตรวจสอบว่า user_id มีอยู่ในตาราง Admin หรือไม่
+                var admin = _context.Admin.FirstOrDefault(a => a.user_id == settingsDto.user_id);
+                if (admin == null)
+                {
+                    return BadRequest("User ID not found in Admin table");
+                }
+
+                // ตรวจสอบว่า UserId ในฐานข้อมูลมีข้อมูล Widget หรือไม่
+                var existingSettings = _context.Widget.FirstOrDefault(ws =>
+                    ws.user_id == settingsDto.user_id
+                );
+
+                if (existingSettings != null)
+                {
+                    // ถ้ามีข้อมูลการตั้งค่าอยู่แล้ว ให้ทำการอัปเดต
+                    existingSettings.settings = settingsDto.Settings;
+                    _context.Widget.Update(existingSettings);
+                }
+                else
+                {
+                    // ถ้ายังไม่มีข้อมูล ให้สร้างข้อมูลใหม่
+                    var newSettings = new Widget
+                    {
+                        user_id = settingsDto.user_id,
+                        settings = settingsDto.Settings,
+                    };
+                    _context.Widget.Add(newSettings);
+                }
+
+                // บันทึกการเปลี่ยนแปลง
+                _context.SaveChanges();
+                return Ok("Widget settings saved successfully");
+            }
+            catch (DbUpdateException ex)
+            {
+                return StatusCode(
+                    500,
+                    $"Database update failed: {ex.InnerException?.Message ?? ex.Message}"
+                );
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An unexpected error occurred: {ex.Message}");
+            }
+        }
 
         // GET: api/widget/get-widget-settings/{userId}
         [HttpGet("get-widget-settings/{user_id}")]
-public IActionResult GetWidget(int user_id)
-{
-    var settings = _context.Widget.FirstOrDefault(ws => ws.user_id == user_id);
+        public IActionResult GetWidget(int user_id)
+        {
+            var settings = _context.Widget.FirstOrDefault(ws => ws.user_id == user_id);
 
-    if (settings == null)
-    {
-        return NotFound("Widget settings not found");
-    }
+            if (settings == null)
+            {
+                return NotFound("Widget settings not found");
+            }
 
-    // ตรวจสอบว่า settings เป็น string ที่เป็น JSON หรือไม่
-    return Ok(settings.settings);  // ส่งกลับเป็น string ที่เป็น JSON
-}
+            // ตรวจสอบว่า settings เป็น string ที่เป็น JSON หรือไม่
+            return Ok(settings.settings); // ส่งกลับเป็น string ที่เป็น JSON
+        }
 
         [HttpGet("get-user-id")]
         public IActionResult GetUserIdByEmail(string email)

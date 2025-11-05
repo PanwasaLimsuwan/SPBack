@@ -429,6 +429,42 @@ WHERE EmpID = @empID AND MonthYear = FORMAT(GETDATE(),'yyyyMM')";
             return null;
         }
 
+        // เพิ่มฟังก์ชันใหม่ในการแจ้งเตือนที่ต้องยืนยันในระบบ Dashboard
+[HttpPost("notify-dashboard")]
+public async Task<IActionResult> NotifyDashboard([FromBody] NotificationRequest request)
+{
+    try
+    {
+        // ดึงข้อมูลหัวหน้างาน
+        var supervisorEmail = await GetSupervisorEmailForEmployee(request.EmpID);
+        if (supervisorEmail == null)
+        {
+            return NotFound("หัวหน้างานไม่พบ");
+        }
+
+        // ส่งการแจ้งเตือนไปยังหัวหน้างานในระบบ
+        // ในที่นี้จะเป็นการส่งข้อมูลแจ้งเตือนที่ Dashboard เพื่อให้หัวหน้าทราบถึงการย้ายงาน
+        await SendDashboardNotification(supervisorEmail, request);
+
+        return Ok("แจ้งเตือนถูกส่งไปยังหัวหน้างาน");
+    }
+    catch (Exception ex)
+    {
+        return Problem(title: "Error sending dashboard notification", detail: ex.Message, statusCode: 500);
+    }
+}
+
+// ฟังก์ชันนี้จะส่งข้อมูลแจ้งเตือนไปยัง Frontend เพื่อให้แสดง Pop-up
+private async Task SendDashboardNotification(string supervisorEmail, NotificationRequest request)
+{
+    // เชื่อมต่อกับระบบแจ้งเตือนที่ Frontend เช่น WebSocket หรือ Push Notification
+    // ส่งข้อมูลที่ต้องการให้แสดงใน Pop-up ไปยังหัวหน้างาน
+    // ที่นี้เราจะทำการส่งไปยัง Frontend โดยอาจจะเป็น WebSocket หรือ API call อื่น ๆ
+    // ตัวอย่าง:
+    // NotificationService.SendToDashboard(supervisorEmail, request);
+}
+
+
         private async Task<string> GetSupervisorEmailForProcess(string process)
         {
             using var conn = new SqlConnection(_connectionString);

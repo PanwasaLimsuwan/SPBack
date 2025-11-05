@@ -36,6 +36,7 @@ builder.Services.AddHostedService<Api.Services.CalculatedAttendanceJob>();
 // builder.Services.AddHostedService<CalculatedAttendanceJob>();
 builder.Services.AddSingleton<AnalyticsRepository>();
 builder.Services.AddScoped<AnalyticsRepository>(); // 👈 เพิ่มบรรทัดนี้
+// builder.Services.AddScoped<DataMigrationService>();
 
 var app = builder.Build();
 

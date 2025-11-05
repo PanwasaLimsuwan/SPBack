@@ -19,7 +19,8 @@ namespace Api.Models
         public string ShiftCode { get; set; }
         public string Position { get; set; }
         public string Email { get; set; }
-        public string PlanID { get; set; }
+        public int PlanID { get; set; }
+        // public string PlanID { get; set; }
 
         // ✅ เพิ่ม Biz และ Process
         public string Biz { get; set; }

@@ -80,12 +80,13 @@ namespace Api.Jobs
                         await reader.CloseAsync();
 
                         // อัปเดตหรือแทรกข้อมูลใน EICC_Control
+                        // ✅ แก้ไขส่วนนี้ใน CalculatedOTJob.cs
                         foreach (var summary in summaryList)
                         {
                             var checkCmd = new SqlCommand(
                                 @"
-                                SELECT COUNT(*) FROM EICC_Control
-                                WHERE EmpID = @EmpID AND WeekID = @WeekID",
+        SELECT COUNT(*) FROM EICC_Control
+        WHERE EmpID = @EmpID AND WeekID = @WeekID",
                                 conn
                             );
 
@@ -94,14 +95,30 @@ namespace Api.Jobs
 
                             var count = (int)await checkCmd.ExecuteScalarAsync();
 
-                            // ถ้าข้อมูลมีอยู่แล้วใน EICC_Control ให้ทำการอัปเดต
+                            // ✅ ตรวจสอบว่าพนักงานยังทำงานอยู่หรือไม่
+                            var statusCheckCmd = new SqlCommand(
+                                @"
+        SELECT TOP 1 Status 
+        FROM CalculatedWorktime 
+        WHERE EmpID = @EmpID 
+        ORDER BY Date DESC",
+                                conn
+                            );
+                            statusCheckCmd.Parameters.AddWithValue("@EmpID", summary.EmpID);
+                            var latestStatus =
+                                (await statusCheckCmd.ExecuteScalarAsync())?.ToString() ?? "Active";
+
+                            // ✅ กำหนด status ตามสถานะล่าสุด
+                            var eiccStatus = latestStatus == "Finished" ? "Complete" : "Active";
+
                             if (count > 0)
                             {
                                 var updateCmd = new SqlCommand(
                                     @"
-                                    UPDATE EICC_Control
-                                    SET MonthYear = @MonthYear, TotalHours = @TotalHours, DaysWorked = @DaysWorked, TotalOT = @TotalOT, Status = @Status
-                                    WHERE EmpID = @EmpID AND WeekID = @WeekID",
+            UPDATE EICC_Control
+            SET MonthYear = @MonthYear, TotalHours = @TotalHours, 
+                DaysWorked = @DaysWorked, TotalOT = @TotalOT, Status = @Status
+            WHERE EmpID = @EmpID AND WeekID = @WeekID",
                                     conn
                                 );
 
@@ -117,17 +134,16 @@ namespace Api.Jobs
                                     summary.DaysWorked
                                 );
                                 updateCmd.Parameters.AddWithValue("@TotalOT", summary.TotalOT);
-                                updateCmd.Parameters.AddWithValue("@Status", "Active");
+                                updateCmd.Parameters.AddWithValue("@Status", eiccStatus); // ✅ ใช้ status ที่คำนวณแล้ว
 
                                 await updateCmd.ExecuteNonQueryAsync();
                             }
                             else
                             {
-                                // ถ้าข้อมูลไม่มีใน EICC_Control ให้แทรกข้อมูลใหม่
                                 var insertCmd = new SqlCommand(
                                     @"
-                                    INSERT INTO EICC_Control (EmpID, WeekID, MonthYear, TotalHours, DaysWorked, TotalOT, Status)
-                                    VALUES (@EmpID, @WeekID, @MonthYear, @TotalHours, @DaysWorked, @TotalOT, @Status)",
+            INSERT INTO EICC_Control (EmpID, WeekID, MonthYear, TotalHours, DaysWorked, TotalOT, Status)
+            VALUES (@EmpID, @WeekID, @MonthYear, @TotalHours, @DaysWorked, @TotalOT, @Status)",
                                     conn
                                 );
 
@@ -143,7 +159,7 @@ namespace Api.Jobs
                                     summary.DaysWorked
                                 );
                                 insertCmd.Parameters.AddWithValue("@TotalOT", summary.TotalOT);
-                                insertCmd.Parameters.AddWithValue("@Status", "Active");
+                                insertCmd.Parameters.AddWithValue("@Status", eiccStatus); // ✅ ใช้ status ที่คำนวณแล้ว
 
                                 await insertCmd.ExecuteNonQueryAsync();
                             }

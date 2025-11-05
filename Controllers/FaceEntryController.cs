@@ -8,17 +8,17 @@
 // {
 //     [ApiController]
 //     [Route("api/[controller]")]
-//     public class GateEntryController : ControllerBase
+//     public class FaceEntryController : ControllerBase
 //     {
 //         private readonly IConfiguration _configuration;
 
-//         public GateEntryController(IConfiguration configuration)
+//         public FaceEntryController(IConfiguration configuration)
 //         {
 //             _configuration = configuration;
 //         }
 
 //         [HttpGet]
-//         public async Task<IActionResult> GetGateEntry(
+//         public async Task<IActionResult> GetFaceEntry(
 //             [FromQuery] string? division,
 //             [FromQuery] string? department,
 //             [FromQuery] string? section,
@@ -59,24 +59,28 @@
 
 //                 var query =
 //                     @"
-//                     WITH RankedFaceVector AS (
-//                         SELECT 
-//                             f.EmpID,
-//                             e.FirstName, e.LastName, e.Division, e.Department, 
-//                             e.Position, e.Email, e.ShiftCode, e.Section,
-//                             e.Biz, e.Process,
-//                             f.Vector, f.Timestamp,
-//                             ROW_NUMBER() OVER (PARTITION BY f.EmpID ORDER BY f.Timestamp DESC) AS rn
-//                         FROM FaceVectors f
-//                         JOIN EmployeeInfo e ON f.EmpID = e.EmpID
-//                         WHERE f.Timestamp BETWEEN @dateStart AND @dateEnd
-//                         AND (@division IS NULL OR e.Division = @division)
-//                         AND (@department IS NULL OR e.Department = @department)
-//                         AND (@section IS NULL OR e.Section = @section)
-//                         AND (@biz IS NULL OR COALESCE(e.Biz, '') = @biz)
-//                         AND (@process IS NULL OR COALESCE(e.Process, '') = @process)
-//                     )
-//                     SELECT * FROM RankedFaceVector WHERE rn = 1";
+//                     WITH RankedFaceEntry AS (
+//     SELECT 
+//     f.FaceVectorID,
+//     f.EmpID,
+//     f.Vector,
+//     f.Timestamp,
+//     e.FirstName, e.LastName, e.Division, e.Department,
+//     e.Position, e.Email, e.ShiftCode, e.Section,
+//     e.Biz, e.Process,
+//     c.CameraID, c.Location, c.Description
+// FROM FaceVectors f
+// JOIN EmployeeInfo e ON f.EmpID = e.EmpID
+// LEFT JOIN Camera c ON c.CameraID = f.CameraID  -- เชื่อมกับตาราง Camera
+// WHERE f.Timestamp BETWEEN @dateStart AND @dateEnd;
+//     AND (@division IS NULL OR e.Division = @division)
+//     AND (@department IS NULL OR e.Department = @department)
+//     AND (@section IS NULL OR e.Section = @section)
+//     AND (@biz IS NULL OR COALESCE(e.Biz, '') = @biz)
+//     AND (@process IS NULL OR COALESCE(e.Process, '') = @process)
+// )
+// SELECT * FROM RankedFaceEntry WHERE rn = 1";
+
 
 //                 using (var cmd = new SqlCommand(query, conn))
 //                 {
@@ -92,6 +96,7 @@
 //                     {
 //                         while (await reader.ReadAsync())
 //                         {
+//                             var faceEntryID = Convert.ToInt32(reader["FaceEntryID"]);
 //                             var empID = Convert.ToInt32(reader["EmpID"]);
 //                             var vector = reader["Vector"]?.ToString();
 //                             var timestamp = reader["Timestamp"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["Timestamp"];
@@ -99,6 +104,7 @@
 //                             result.Add(
 //                                 new
 //                                 {
+//                                     FaceEntryID = faceEntryID,
 //                                     EmpID = empID,
 //                                     firstName = reader["FirstName"]?.ToString(),
 //                                     lastName = reader["LastName"]?.ToString(),
@@ -112,6 +118,9 @@
 //                                     timestamp = timestamp?.ToString("yyyy-MM-dd HH:mm:ss"),
 //                                     biz = reader["Biz"]?.ToString(),
 //                                     process = reader["Process"]?.ToString(),
+//                                     cameraID = reader["CameraID"]?.ToString(),
+//                                     location = reader["Location"]?.ToString(),
+//                                     description = reader["Description"]?.ToString()
 //                                 }
 //                             );
 //                         }

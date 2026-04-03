@@ -24,7 +24,7 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/Assignment?status=Active&toBiz=...&toProcess=...
+        // GET: api/Assignment
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? status,
@@ -35,7 +35,6 @@ namespace Api.Controllers
             try
             {
                 var results = new List<object>();
-
                 using var conn = new SqlConnection(_connectionString);
                 await conn.OpenAsync();
 
@@ -67,7 +66,6 @@ WHERE 1=1"
                 }
 
                 cmd.CommandText = sb.ToString();
-
                 using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
                 {
@@ -87,7 +85,6 @@ WHERE 1=1"
                         }
                     );
                 }
-
                 return Ok(results);
             }
             catch (Exception ex)
@@ -97,7 +94,6 @@ WHERE 1=1"
         }
 
         // POST: api/Assignment
-        // สร้าง Assignment ใหม่ (AssignmentID สร้างที่ DB ด้วย SEQUENCE/DEFAULT)
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Assignment assignment)
         {
@@ -106,7 +102,6 @@ WHERE 1=1"
                 if (assignment == null)
                     return BadRequest("Invalid payload.");
 
-                // validate ฟิลด์จำเป็น
                 var errors = new List<string>();
                 if (assignment.EmpID <= 0)
                     errors.Add("EmpID is required.");
@@ -120,15 +115,11 @@ WHERE 1=1"
                     return BadRequest(string.Join(" ", errors));
 
                 var startAt = assignment.StartAt == default ? DateTime.UtcNow : assignment.StartAt;
-
-                // ✅ ให้ EndAt เป็น NULL เมื่อไม่ส่งมา (ตรงความต้องการ)
-                object endAt = (assignment.EndAt == default) ? DBNull.Value : assignment.EndAt;
-
-                // var status = string.IsNullOrWhiteSpace(assignment.Status)
-                //     ? "Active"
-                //     : assignment.Status;
-                // Default Status to 'Pending'
-        var status = string.IsNullOrWhiteSpace(assignment.Status) ? "Pending" : assignment.Status;
+                object endAt =
+                    (assignment.EndAt == default) ? DBNull.Value : (object)assignment.EndAt;
+                var status = string.IsNullOrWhiteSpace(assignment.Status)
+                    ? "Pending"
+                    : assignment.Status;
 
                 using var conn = new SqlConnection(_connectionString);
                 await conn.OpenAsync();
@@ -160,9 +151,7 @@ VALUES
                 cmd.Parameters.Add("@EndAt", SqlDbType.DateTime2).Value = endAt;
                 cmd.Parameters.Add("@Status", SqlDbType.NVarChar, 50).Value = status;
 
-                var newIdObj = await cmd.ExecuteScalarAsync();
-                var newId = Convert.ToInt32(newIdObj);
-
+                var newId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 return Ok(
                     new { assignmentID = newId, message = "Assignment created successfully." }
                 );
@@ -177,6 +166,186 @@ VALUES
             }
         }
 
+        // POST: api/Assignment/auto-assign
+        [HttpPost("auto-assign")]
+        public async Task<IActionResult> AutoAssign([FromBody] AutoAssignRequest req)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.Process))
+                return BadRequest("Process is required.");
+
+            var candidates = await GetAutoAssignCandidates(req);
+            if (candidates.Count == 0)
+                return Ok(
+                    new AutoAssignResult
+                    {
+                        Assigned = new(),
+                        AssignedCount = 0,
+                        RequestedCount = req.HeadcountNeed,
+                        ShortfallCount = req.HeadcountNeed,
+                        Message = "ไม่พบพนักงานที่ตรงเงื่อนไข",
+                    }
+                );
+
+            var sorted = candidates
+                .OrderByDescending(c => c.TotalSkill)
+                .ThenBy(c => c.TotalTime)
+                .ToList();
+            var assigned = new List<AutoAssignedEmployee>();
+            var take = Math.Min(req.HeadcountNeed, sorted.Count);
+
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            foreach (var emp in sorted.Take(take))
+            {
+                var sql =
+                    @"
+INSERT INTO Assignment
+  (EmpID, FromBiz, FromProcess, ToBiz, ToProcess, SkillGroup, StartAt, EndAt, Status)
+OUTPUT INSERTED.AssignmentID
+VALUES (@EmpID,@FromBiz,@FromProcess,@ToBiz,@ToProcess,@SkillGroup,@StartAt,NULL,'Pending')";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.Add("@EmpID", SqlDbType.Int).Value = emp.EmpID;
+                cmd.Parameters.Add("@FromBiz", SqlDbType.NVarChar, 100).Value =
+                    (object?)emp.FromBiz ?? DBNull.Value;
+                cmd.Parameters.Add("@FromProcess", SqlDbType.NVarChar, 100).Value =
+                    (object?)emp.FromProcess ?? DBNull.Value;
+                cmd.Parameters.Add("@ToBiz", SqlDbType.NVarChar, 100).Value =
+                    string.IsNullOrWhiteSpace(req.ToBiz) ? (object)DBNull.Value : req.ToBiz;
+                cmd.Parameters.Add("@ToProcess", SqlDbType.NVarChar, 100).Value = req.Process;
+                cmd.Parameters.Add("@SkillGroup", SqlDbType.NVarChar, 100).Value =
+                    req.SkillGroup ?? "General";
+                cmd.Parameters.Add("@StartAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+
+                var newId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                assigned.Add(
+                    new AutoAssignedEmployee
+                    {
+                        AssignmentID = newId,
+                        EmpID = emp.EmpID,
+                        FirstName = emp.FirstName,
+                        LastName = emp.LastName,
+                        TotalSkill = emp.TotalSkill,
+                        TotalTime = emp.TotalTime,
+                    }
+                );
+
+                // ✅ แจ้งหัวหน้า FromProcess ให้ approve (ไม่ใช่แจ้งพนักงาน)
+                var empCopy = emp;
+                var reqCopy = req;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var fromSupervisorEmail = await GetEmailFromAdminByProcess(
+                            empCopy.FromBiz,
+                            empCopy.FromProcess
+                        );
+                        if (string.IsNullOrEmpty(fromSupervisorEmail))
+                            fromSupervisorEmail = "panwasalimsuwan@gmail.com";
+
+                        // EmailService.SendEmail(fromSupervisorEmail,
+                        EmailService.SendEmail(
+                            "panwasalimsuwan@gmail.com",
+                            $"[รออนุมัติ] Auto-Assign พนักงาน {empCopy.EmpID} → {reqCopy.Process}",
+                            $"ระบบได้ Auto-Assign พนักงาน {empCopy.EmpID} {empCopy.FirstName} {empCopy.LastName}\n"
+                                + $"ไปช่วยงาน Process: {reqCopy.Process} / Biz: {reqCopy.ToBiz}\n"
+                                + $"Skill รวม: {empCopy.TotalSkill} | OT: {empCopy.TotalTime:F1}h\n"
+                                + $"กรุณาเข้า Dashboard เพื่ออนุมัติ"
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AutoAssign] Email error: {ex.Message}");
+                    }
+                });
+            }
+
+            var shortfall = req.HeadcountNeed - assigned.Count;
+            return Ok(
+                new AutoAssignResult
+                {
+                    Assigned = assigned,
+                    AssignedCount = assigned.Count,
+                    RequestedCount = req.HeadcountNeed,
+                    ShortfallCount = shortfall,
+                    Message =
+                        shortfall > 0
+                            ? $"Assign ได้ {assigned.Count} คน ขาดอีก {shortfall} คน"
+                            : $"Assign ครบ {assigned.Count} คน",
+                }
+            );
+        }
+
+        // helper: auto-assign candidates — ดึง FromBiz/FromProcess ด้วย
+        private async Task<List<AutoCandidate>> GetAutoAssignCandidates(AutoAssignRequest req)
+        {
+            var list = new List<AutoCandidate>();
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var sql =
+                @"
+SELECT
+    s.EmpID,
+    s.FirstName,
+    s.LastName,
+    ISNULL(s.Material,0)+ISNULL(s.Operation,0)+
+    ISNULL(s.MachineSAB1,0)+ISNULL(s.MachineSAB2,0)+
+    ISNULL(s.MachineSAB3,0)+ISNULL(s.Inspection,0) AS TotalSkill,
+    ISNULL(ot.TotalHours,0) AS TotalTime,
+    e.Biz     AS FromBiz,
+    e.Process AS FromProcess
+FROM Skill s
+INNER JOIN Attendance a
+    ON  a.EmpID = s.EmpID
+    AND CAST(a.Date AS DATE) = @workDate
+    AND a.Status NOT IN ('Absent')
+LEFT JOIN (
+    SELECT EmpID, SUM(TotalHours) AS TotalHours
+    FROM   EICC_Control
+    WHERE  Year = YEAR(GETDATE())
+    GROUP BY EmpID
+) ot ON ot.EmpID = s.EmpID
+INNER JOIN EmployeeInfo e ON e.EmpID = s.EmpID
+WHERE e.Position NOT IN (
+    'Supervisor','Foreman','Section Chief','Manager',
+    'Senior Engineer','Executive Director','General Manager',
+    'Assistant General Manager','Officer','Senior Officer'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM Assignment aa
+    WHERE aa.EmpID = s.EmpID AND aa.Status IN ('Active','Pending') AND aa.Status IN ('Active','Pending','Returning')
+)
+AND (
+    ISNULL(s.Material,0)+ISNULL(s.Operation,0)+
+    ISNULL(s.MachineSAB1,0)+ISNULL(s.MachineSAB2,0)+
+    ISNULL(s.MachineSAB3,0)+ISNULL(s.Inspection,0)
+) > 0";
+
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@workDate", SqlDbType.Date).Value =
+                req.WorkDate == default ? DateTime.Today : req.WorkDate.Date;
+
+            using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+                list.Add(
+                    new AutoCandidate
+                    {
+                        EmpID = r.GetInt32(0),
+                        FirstName = r.IsDBNull(1) ? "" : r.GetString(1),
+                        LastName = r.IsDBNull(2) ? "" : r.GetString(2),
+                        TotalSkill = r.GetInt32(3),
+                        TotalTime = r.GetDouble(4),
+                        FromBiz = r.IsDBNull(5) ? null : r.GetString(5),
+                        FromProcess = r.IsDBNull(6) ? null : r.GetString(6),
+                    }
+                );
+
+            return list;
+        }
+
         // PUT: api/Assignment/{id}/status?status=Completed
         [HttpPut("{id:int}/status")]
         public async Task<IActionResult> UpdateStatus([FromRoute] int id, [FromQuery] string status)
@@ -189,10 +358,17 @@ VALUES
                 using var conn = new SqlConnection(_connectionString);
                 await conn.OpenAsync();
 
-                var sql = @"UPDATE Assignment SET Status = @status WHERE AssignmentID = @id";
+                // ✅ เซ็ต EndAt เมื่อ Completed หรือ Cancelled
+                string sql =
+                    (status == "Completed" || status == "Cancelled")
+                        ? "UPDATE Assignment SET Status=@status, EndAt=@endAt WHERE AssignmentID=@id"
+                        : "UPDATE Assignment SET Status=@status WHERE AssignmentID=@id";
+
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.Add("@status", SqlDbType.NVarChar, 50).Value = status;
                 cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+                if (status == "Completed" || status == "Cancelled")
+                    cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
 
                 var rows = await cmd.ExecuteNonQueryAsync();
                 if (rows == 0)
@@ -205,57 +381,42 @@ VALUES
             }
         }
 
-        // DTO สำหรับปิดงาน
         public class UpdateEndAtDto
         {
             public DateTime? EndAt { get; set; }
             public string? Status { get; set; }
         }
 
-        // PUT: api/Assignment/{empID}  -> ปิดงาน Active ของพนักงาน (EndAt + Status)
+        // PUT: api/Assignment/{empID}
         [HttpPut("{empID:int}")]
         public async Task<IActionResult> UpdateEndAt(
             [FromRoute] int empID,
             [FromBody] UpdateEndAtDto model
         )
         {
-            try
-            {
-                if (model == null)
-                    return BadRequest("Invalid payload.");
+            var endAt = model?.EndAt ?? DateTime.UtcNow;
+            var status = string.IsNullOrWhiteSpace(model?.Status) ? "Completed" : model.Status;
 
-                var endAt = model.EndAt ?? DateTime.UtcNow;
-                var status = string.IsNullOrWhiteSpace(model.Status) ? "Completed" : model.Status;
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
 
-                using var conn = new SqlConnection(_connectionString);
-                await conn.OpenAsync();
+            var sql =
+                @"UPDATE Assignment
+                        SET EndAt=@EndAt, Status=@Status
+                        WHERE EmpID=@empID AND Status IN ('Active','Pending')";
 
-                var sql =
-                    @"
-UPDATE Assignment
-SET EndAt = @EndAt,
-    Status = @Status
-WHERE EmpID = @empID AND Status = 'Active'";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@EndAt", SqlDbType.DateTime2).Value = endAt;
+            cmd.Parameters.Add("@Status", SqlDbType.NVarChar, 50).Value = status;
+            cmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
 
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.Add("@EndAt", SqlDbType.DateTime2).Value = endAt;
-                cmd.Parameters.Add("@Status", SqlDbType.NVarChar, 50).Value = status;
-                cmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
-
-                var rows = await cmd.ExecuteNonQueryAsync();
-                if (rows == 0)
-                    return NotFound("Assignment not found or not Active.");
-
-                return Ok("EndAt updated successfully.");
-            }
-            catch (Exception ex)
-            {
-                return Problem(title: "UpdateEndAt failed", detail: ex.Message, statusCode: 500);
-            }
+            var rows = await cmd.ExecuteNonQueryAsync();
+            if (rows == 0)
+                return NotFound("Assignment not found or already closed.");
+            return Ok("EndAt updated successfully.");
         }
 
         // DELETE: api/Assignment/emp/{empID}
-        // ลบ Assignment ทั้งหมดของ EmpID นั้น และหักชั่วโมงออกจาก EICC_Control (เดือนปัจจุบัน)
         [HttpDelete("emp/{empID:int}")]
         public async Task<IActionResult> DeleteByEmpID([FromRoute] int empID)
         {
@@ -266,37 +427,28 @@ WHERE EmpID = @empID AND Status = 'Active'";
                 await conn.OpenAsync();
                 tx = conn.BeginTransaction();
 
-                // รวมชั่วโมงก่อนลบ
                 var hoursSql =
-                    @"
-SELECT ISNULL(SUM(DATEDIFF(HOUR, StartAt, EndAt)), 0)
-FROM Assignment
-WHERE EmpID = @empID";
-
+                    "SELECT ISNULL(SUM(DATEDIFF(HOUR,StartAt,EndAt)),0) FROM Assignment WHERE EmpID=@empID";
                 using var hoursCmd = new SqlCommand(hoursSql, conn, tx);
                 hoursCmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
-                var totalHoursObj = await hoursCmd.ExecuteScalarAsync();
-                var totalHours = Convert.ToInt32(totalHoursObj);
+                var totalHours = Convert.ToInt32(await hoursCmd.ExecuteScalarAsync());
 
-                // ลบ assignment ทั้งหมด
-                var delSql = "DELETE FROM Assignment WHERE EmpID = @empID";
-                using var delCmd = new SqlCommand(delSql, conn, tx);
+                using var delCmd = new SqlCommand(
+                    "DELETE FROM Assignment WHERE EmpID=@empID",
+                    conn,
+                    tx
+                );
                 delCmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
                 var rowsAffected = await delCmd.ExecuteNonQueryAsync();
-
                 if (rowsAffected == 0)
                 {
                     tx.Rollback();
-                    return NotFound("No assignments found for this employee.");
+                    return NotFound("No assignments found.");
                 }
 
-                // อัปเดต EICC_Control ด้วยจำนวนชั่วโมงที่คำนวณไว้
                 var updSql =
-                    @"
-UPDATE EICC_Control
-SET TotalHours = ISNULL(TotalHours,0) - @totalHours
-WHERE EmpID = @empID AND MonthYear = FORMAT(GETDATE(),'yyyyMM')";
-
+                    @"UPDATE EICC_Control SET TotalHours=ISNULL(TotalHours,0)-@totalHours
+                               WHERE EmpID=@empID AND Year=YEAR(GETDATE())";
                 using var updCmd = new SqlCommand(updSql, conn, tx);
                 updCmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
                 updCmd.Parameters.Add("@totalHours", SqlDbType.Int).Value = totalHours;
@@ -311,9 +463,7 @@ WHERE EmpID = @empID AND MonthYear = FORMAT(GETDATE(),'yyyyMM')";
                 {
                     tx?.Rollback();
                 }
-                catch
-                { /* ignore */
-                }
+                catch { }
                 return Problem(title: "DeleteByEmpID failed", detail: ex.Message, statusCode: 500);
             }
         }
@@ -322,71 +472,92 @@ WHERE EmpID = @empID AND MonthYear = FORMAT(GETDATE(),'yyyyMM')";
         [HttpPut("{id:int}/approve")]
         public async Task<IActionResult> ApproveAssignment([FromRoute] int id)
         {
-            try
+            var assignment = await GetAssignmentById(id);
+            if (assignment == null)
+                return NotFound("Assignment not found.");
+            if (assignment.Status != "Pending")
+                return BadRequest("Assignment is not Pending.");
+
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var sql =
+                "UPDATE Assignment SET Status='Active' WHERE AssignmentID=@id AND Status='Pending'";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+            var rows = await cmd.ExecuteNonQueryAsync();
+            if (rows == 0)
+                return NotFound("Assignment not found or already approved.");
+
+            // ✅ ส่ง email หลัง approve
+            _ = Task.Run(async () =>
             {
-                // ค้นหางานที่ต้องการยืนยัน
-                var assignment = await GetAssignmentById(id); // ฟังก์ชันนี้จะดึงข้อมูลของ Assignment ตาม id
-                if (assignment == null)
-                    return NotFound("Assignment not found.");
-
-                // ตรวจสอบสถานะ Assignment ว่าเป็น Pending
-                if (assignment.Status != "Pending")
-                    return BadRequest("Assignment is not in 'Pending' status.");
-
-                // อัปเดตสถานะให้เป็น Active
-                using var conn = new SqlConnection(_connectionString);
-                await conn.OpenAsync();
-
-                var sql =
-                    @"UPDATE Assignment
-            SET Status = 'Active'
-            WHERE AssignmentID = @id AND Status = 'Pending'";
-
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
-
-                var rows = await cmd.ExecuteNonQueryAsync();
-                if (rows == 0)
-                    return NotFound("Assignment not found or already approved.");
-
-                // ส่งการแจ้งเตือนผ่านอีเมล
-                var supervisorEmail = await GetSupervisorEmailForEmployee(assignment.EmpID);
-                if (!string.IsNullOrEmpty(supervisorEmail))
+                try
                 {
-                    var subject = "Assignment Approved";
-                    var body = $"Assignment ID {id} has been approved and is now Active.";
-                    await SendNotification(
-                        new NotificationRequest
-                        {
-                            EmpID = assignment.EmpID,
-                            ToProcess = assignment.ToProcess,
-                            ToBiz = assignment.ToBiz,
-                        }
-                    );
-                }
+                    // 1. แจ้งพนักงาน (ดึง email จาก Admin table)
+                    var empEmail = await GetEmailFromAdmin(assignment.EmpID);
+                    if (!string.IsNullOrEmpty(empEmail))
+                    {
+                        // EmailService.SendEmail(empEmail,
+                        EmailService.SendEmail(
+                            "panwasalimsuwan@gmail.com",
+                            $"[อนุมัติแล้ว] คุณได้รับมอบหมายงานที่ {assignment.ToProcess}",
+                            $"Assignment ของคุณได้รับการอนุมัติแล้ว\n"
+                                + $"กรุณาไปช่วยงาน Process: {assignment.ToProcess} / Biz: {assignment.ToBiz}\n"
+                                + $"สถานะ: Active"
+                        );
+                    }
 
-                return Ok("Assignment approved successfully.");
-            }
-            catch (Exception ex)
-            {
-                return Problem(title: "Approval failed", detail: ex.Message, statusCode: 500);
-            }
+                    // 2. แจ้งหัวหน้า ToProcess ว่ามีคนมาช่วยแล้ว
+                    var toLeaderEmail = await GetEmailFromAdminByProcess(
+                        assignment.ToBiz,
+                        assignment.ToProcess
+                    );
+                    if (!string.IsNullOrEmpty(toLeaderEmail))
+                    {
+                        // EmailService.SendEmail(toLeaderEmail,
+                        EmailService.SendEmail(
+                            "panwasalimsuwan@gmail.com",
+                            $"[แจ้งเตือน] พนักงาน {assignment.EmpID} จะมาช่วยงาน {assignment.ToProcess}",
+                            $"Assignment ได้รับการอนุมัติแล้ว\n"
+                                + $"พนักงาน {assignment.EmpID} จะมาช่วยงาน {assignment.ToProcess} / {assignment.ToBiz}"
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Email error: {ex.Message}");
+                }
+            });
+
+            return Ok(new { message = "Assignment approved.", assignmentID = id });
         }
 
+        // POST: api/Assignment/notify — แจ้งหัวหน้า FromProcess ให้ approve
         [HttpPost("notify")]
         public async Task<IActionResult> SendNotification([FromBody] NotificationRequest request)
         {
             try
             {
-                var supervisorEmail = "panwasalimsuwan@gmail.com"; // หรือใช้ฟังก์ชัน GetSupervisorEmailForProcess() ถ้าคุณต้องการดึงอีเมลจากฐานข้อมูล
-                var subject = "Employee Assignment Notification";
+                // ✅ แจ้งหัวหน้าของ FromBiz/FromProcess (ต้นทาง) ให้ approve
+                var fromLeaderEmail = await GetEmailFromAdminByProcess(
+                    request.FromBiz,
+                    request.FromProcess
+                );
+
+                if (string.IsNullOrEmpty(fromLeaderEmail))
+                    fromLeaderEmail = "panwasalimsuwan@gmail.com"; // fallback
+
+                var subject = $"[รออนุมัติ] คำขอย้ายพนักงาน {request.EmpID} → {request.ToProcess}";
                 var body =
-                    $"พนักงาน {request.EmpID} ได้ย้ายไปยังแผนก {request.ToProcess} ที่ธุรกิจ {request.ToBiz}. กรุณาตรวจสอบการย้ายงาน.";
+                    $"มีคำขอย้ายพนักงาน รหัส {request.EmpID}\n"
+                    + $"จาก Process: {request.FromProcess} / Biz: {request.FromBiz}\n"
+                    + $"ไปยัง Process: {request.ToProcess} / Biz: {request.ToBiz}\n"
+                    + $"กรุณาเข้า Dashboard เพื่ออนุมัติ";
 
-                // ส่งอีเมลแจ้งเตือน
-                EmailService.SendEmail(supervisorEmail, subject, body);
-
-                return Ok("Email sent successfully.");
+                // EmailService.SendEmail(fromLeaderEmail, subject, body);
+                EmailService.SendEmail("panwasalimsuwan@gmail.com", subject, body);
+                return Ok("Email sent to supervisor.");
             }
             catch (Exception ex)
             {
@@ -394,20 +565,102 @@ WHERE EmpID = @empID AND MonthYear = FORMAT(GETDATE(),'yyyyMM')";
             }
         }
 
-        private async Task<Assignment> GetAssignmentById(int id)
+        // GET: api/Assignment/with-employees
+        [HttpGet("with-employees")]
+        public async Task<IActionResult> GetWithEmployees(
+            [FromQuery] string? status,
+            [FromQuery] string? toBiz,
+            [FromQuery] string? toProcess,
+            [FromQuery] string? fromBiz,
+            [FromQuery] string? fromProcess
+        )
         {
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            var sql =
-                @"SELECT AssignmentID, EmpID, FromBiz, FromProcess, ToBiz, ToProcess, 
-               SkillGroup, StartAt, EndAt, Status
-        FROM Assignment
-        WHERE AssignmentID = @id";
+            var sb = new StringBuilder(
+                @"
+SELECT 
+    a.AssignmentID, a.EmpID,
+    e.FirstName, e.LastName, e.Position,
+    a.FromBiz, a.FromProcess,
+    a.ToBiz, a.ToProcess,
+    a.SkillGroup, a.StartAt, a.EndAt, a.Status
+FROM Assignment a
+LEFT JOIN EmployeeInfo e ON e.EmpID = a.EmpID
+WHERE 1=1"
+            );
 
+            using var cmd = new SqlCommand();
+            cmd.Connection = conn;
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                sb.Append(" AND a.Status = @status");
+                cmd.Parameters.Add("@status", SqlDbType.NVarChar, 50).Value = status;
+            }
+            if (!string.IsNullOrWhiteSpace(toBiz))
+            {
+                sb.Append(" AND a.ToBiz = @toBiz");
+                cmd.Parameters.Add("@toBiz", SqlDbType.NVarChar, 100).Value = toBiz;
+            }
+            if (!string.IsNullOrWhiteSpace(toProcess))
+            {
+                sb.Append(" AND a.ToProcess = @toProcess");
+                cmd.Parameters.Add("@toProcess", SqlDbType.NVarChar, 100).Value = toProcess;
+            }
+            if (!string.IsNullOrWhiteSpace(fromBiz))
+            {
+                sb.Append(" AND a.FromBiz = @fromBiz");
+                cmd.Parameters.Add("@fromBiz", SqlDbType.NVarChar, 100).Value = fromBiz;
+            }
+            if (!string.IsNullOrWhiteSpace(fromProcess))
+            {
+                sb.Append(" AND a.FromProcess = @fromProcess");
+                cmd.Parameters.Add("@fromProcess", SqlDbType.NVarChar, 100).Value = fromProcess;
+            }
+
+            sb.Append(" ORDER BY a.StartAt DESC");
+            cmd.CommandText = sb.ToString();
+
+            var results = new List<object>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                results.Add(
+                    new
+                    {
+                        assignmentID = reader.GetInt32(0),
+                        empID = reader.GetInt32(1),
+                        firstName = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                        lastName = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                        position = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                        fromBiz = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        fromProcess = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        toBiz = reader.IsDBNull(7) ? null : reader.GetString(7),
+                        toProcess = reader.IsDBNull(8) ? null : reader.GetString(8),
+                        skillGroup = reader.IsDBNull(9) ? null : reader.GetString(9),
+                        startAt = reader.GetDateTime(10),
+                        endAt = reader.IsDBNull(11) ? (DateTime?)null : reader.GetDateTime(11),
+                        status = reader.IsDBNull(12) ? null : reader.GetString(12),
+                    }
+                );
+            }
+            return Ok(results);
+        }
+
+        // ─── Private helpers ───────────────────────────────────────
+
+        private async Task<Assignment?> GetAssignmentById(int id)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            var sql =
+                @"SELECT AssignmentID,EmpID,FromBiz,FromProcess,ToBiz,ToProcess,
+                               SkillGroup,StartAt,EndAt,Status
+                        FROM Assignment WHERE AssignmentID=@id";
             using var cmd = new SqlCommand(sql, conn);
             cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
-
             using var reader = await cmd.ExecuteReaderAsync();
             if (await reader.ReadAsync())
             {
@@ -425,161 +678,77 @@ WHERE EmpID = @empID AND MonthYear = FORMAT(GETDATE(),'yyyyMM')";
                     Status = reader.IsDBNull(9) ? null : reader.GetString(9),
                 };
             }
-
             return null;
         }
 
-        // เพิ่มฟังก์ชันใหม่ในการแจ้งเตือนที่ต้องยืนยันในระบบ Dashboard
-[HttpPost("notify-dashboard")]
-public async Task<IActionResult> NotifyDashboard([FromBody] NotificationRequest request)
-{
-    try
-    {
-        // ดึงข้อมูลหัวหน้างาน
-        var supervisorEmail = await GetSupervisorEmailForEmployee(request.EmpID);
-        if (supervisorEmail == null)
-        {
-            return NotFound("หัวหน้างานไม่พบ");
-        }
-
-        // ส่งการแจ้งเตือนไปยังหัวหน้างานในระบบ
-        // ในที่นี้จะเป็นการส่งข้อมูลแจ้งเตือนที่ Dashboard เพื่อให้หัวหน้าทราบถึงการย้ายงาน
-        await SendDashboardNotification(supervisorEmail, request);
-
-        return Ok("แจ้งเตือนถูกส่งไปยังหัวหน้างาน");
-    }
-    catch (Exception ex)
-    {
-        return Problem(title: "Error sending dashboard notification", detail: ex.Message, statusCode: 500);
-    }
-}
-
-// ฟังก์ชันนี้จะส่งข้อมูลแจ้งเตือนไปยัง Frontend เพื่อให้แสดง Pop-up
-private async Task SendDashboardNotification(string supervisorEmail, NotificationRequest request)
-{
-    // เชื่อมต่อกับระบบแจ้งเตือนที่ Frontend เช่น WebSocket หรือ Push Notification
-    // ส่งข้อมูลที่ต้องการให้แสดงใน Pop-up ไปยังหัวหน้างาน
-    // ที่นี้เราจะทำการส่งไปยัง Frontend โดยอาจจะเป็น WebSocket หรือ API call อื่น ๆ
-    // ตัวอย่าง:
-    // NotificationService.SendToDashboard(supervisorEmail, request);
-}
-
-
-        private async Task<string> GetSupervisorEmailForProcess(string process)
+        // ✅ ดึง email พนักงานจาก Admin table (ใช้หลัง approve)
+        private async Task<string?> GetEmailFromAdmin(int empID)
         {
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-
-            // ปรับ query ให้ใช้ตาราง EmployeeInfo
-            var query =
-                @"
-        SELECT Email
-        FROM EmployeeInfo
-        WHERE Process = @process"; // ใช้ Process จาก EmployeeInfo
-
-            using var cmd = new SqlCommand(query, conn);
-            cmd.Parameters.Add("@process", SqlDbType.NVarChar, 100).Value = process;
-
-            try
-            {
-                var result = await cmd.ExecuteScalarAsync();
-                if (result != null)
-                {
-                    return result.ToString(); // ถ้ามีผลลัพธ์ก็คืนค่าอีเมล
-                }
-                else
-                {
-                    // ถ้าไม่พบข้อมูลที่ตรงกับ process
-                    return null; // หรือสามารถส่งข้อความอื่นได้ เช่น "No supervisor found for this process"
-                }
-            }
-            catch (Exception ex)
-            {
-                // ในกรณีที่เกิดข้อผิดพลาด
-                Console.WriteLine($"Error occurred: {ex.Message}");
-                return null; // หรือสามารถส่งข้อความแสดงข้อผิดพลาดที่ต้องการ
-            }
-        }
-
-        private async Task<string> GetSupervisorEmailForEmployee(int empID)
-        {
-            using var conn = new SqlConnection(_connectionString);
-            await conn.OpenAsync();
-
-            var query =
-                @"SELECT Email
-          FROM EmployeeInfo
-          WHERE EmpID = @empID";
-
-            using var cmd = new SqlCommand(query, conn);
+            var sql = "SELECT Email FROM Admin WHERE EmpID = @empID";
+            using var cmd = new SqlCommand(sql, conn);
             cmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
-
-            try
-            {
-                var result = await cmd.ExecuteScalarAsync();
-                return result?.ToString();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error occurred: {ex.Message}");
-                return null;
-            }
+            var result = await cmd.ExecuteScalarAsync();
+            return result?.ToString();
         }
 
-        //         public async Task<IActionResult> AssignEmployeeToProcess([FromBody] Assignment assignment)
-        // {
-        //     try
-        //     {
-        //         // ตรวจสอบหัวหน้างานของ ToProcess
-        //         var supervisorEmail = await GetSupervisorEmailForProcess(assignment.ToProcess);
-        //         if (supervisorEmail != null)
-        //         {
-        //             var subject = "Employee Assignment Notification";
-        //             var body = $"พนักงาน {assignment.EmpID} ได้ย้ายไปยังแผนก {assignment.ToProcess}. กรุณาตรวจสอบการย้ายงาน.";
-
-        //             // ส่งอีเมลแจ้งเตือนหัวหน้างาน
-        //             EmailService.SendEmail(supervisorEmail, subject, body);
-        //         }
-
-        //         // ดำเนินการสร้าง Assignment ต่อไป
-        //         return await Create(assignment);
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return Problem(title: "Error assigning employee", detail: ex.Message, statusCode: 500);
-        //     }
-        // }
-
-        public async Task<IActionResult> AssignEmployeeToProcess([FromBody] Assignment assignment)
+        // ✅ ดึง email หัวหน้าของ Biz+Process จาก Admin table
+        private async Task<string?> GetEmailFromAdminByProcess(string? biz, string? process)
         {
-            try
-            {
-                // ส่งอีเมลแจ้งเตือนไปที่ panwasalimsuwan@gmail.com
-                var supervisorEmail = "panwasalimsuwan@gmail.com"; // เปลี่ยนเป็นอีเมลที่ต้องการ
-                var subject = "Employee Assignment Notification";
-                var body =
-                    $"พนักงาน {assignment.EmpID} ได้ย้ายไปยังแผนก {assignment.ToProcess}. กรุณาตรวจสอบการย้ายงาน.";
+            if (string.IsNullOrEmpty(biz) && string.IsNullOrEmpty(process))
+                return null;
 
-                // Debug log เพื่อดูว่าโค้ดเข้าถึงจุดนี้หรือไม่
-                Console.WriteLine("Sending email to: " + supervisorEmail);
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            var sql =
+                @"
+SELECT TOP 1 a.Email
+FROM Admin a
+JOIN EmployeeInfo e ON e.EmpID = a.EmpID
+WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
+  AND (@biz     IS NULL OR e.Biz     = @biz)
+  AND (@process IS NULL OR e.Process = @process)";
 
-                // ส่งอีเมลแจ้งเตือนหัวหน้างาน
-                EmailService.SendEmail(supervisorEmail, subject, body);
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@biz", SqlDbType.NVarChar, 100).Value = string.IsNullOrEmpty(biz)
+                ? (object)DBNull.Value
+                : biz;
+            cmd.Parameters.Add("@process", SqlDbType.NVarChar, 100).Value = string.IsNullOrEmpty(
+                process
+            )
+                ? (object)DBNull.Value
+                : process;
 
-                // Debug log หลังจากส่งอีเมล
-                Console.WriteLine("Email sent successfully!");
+            var result = await cmd.ExecuteScalarAsync();
+            return result?.ToString();
+        }
 
-                // ดำเนินการสร้าง Assignment ต่อไป
-                return await Create(assignment);
-            }
-            catch (Exception ex)
-            {
-                return Problem(
-                    title: "Error assigning employee",
-                    detail: ex.Message,
-                    statusCode: 500
-                );
-            }
+        // deprecated helpers (ใช้ Admin table แทนแล้ว)
+        private async Task<string?> GetSupervisorEmailForProcess(string process)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            var sql = "SELECT TOP 1 Email FROM EmployeeInfo WHERE Process=@process";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@process", SqlDbType.NVarChar, 100).Value = process;
+            return (await cmd.ExecuteScalarAsync())?.ToString();
+        }
+
+        private async Task<string?> GetSupervisorEmailForEmployee(int empID)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            var sql = "SELECT Email FROM EmployeeInfo WHERE EmpID=@empID";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@empID", SqlDbType.Int).Value = empID;
+            return (await cmd.ExecuteScalarAsync())?.ToString();
+        }
+
+        [HttpPost("notify-dashboard")]
+        public async Task<IActionResult> NotifyDashboard([FromBody] NotificationRequest request)
+        {
+            return Ok("acknowledged");
         }
 
         public class EmailService
@@ -588,35 +757,207 @@ private async Task SendDashboardNotification(string supervisorEmail, Notificatio
             {
                 try
                 {
-                    // สร้าง MimeMessage สำหรับส่งอีเมล
                     var message = new MimeMessage();
-                    message.From.Add(new MailboxAddress("Your Company", "your-email@example.com"));
-                    message.To.Add(new MailboxAddress("Recipient", toEmail));
+                    message.From.Add(
+                        new MailboxAddress("MFG Dashboard", "panwasalimsuwan@gmail.com")
+                    );
+                    message.To.Add(new MailboxAddress("", toEmail));
                     message.Subject = subject;
+                    message.Body = new BodyBuilder { TextBody = body }.ToMessageBody();
 
-                    // สร้างเนื้อหาอีเมล
-                    var bodyBuilder = new BodyBuilder { TextBody = body };
-
-                    message.Body = bodyBuilder.ToMessageBody();
-
-                    // เชื่อมต่อและส่งอีเมลผ่าน SMTP
-                    using (var client = new SmtpClient())
-                    {
-                        client.Connect("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
-
-                        // ใช้ App Password
-                        client.Authenticate("panwasalimsuwan@gmail.com", "xemtsrhrnzpddwjl"); // ใช้ App Password แทนรหัสผ่านปกติ
-
-                        client.Send(message);
-                        client.Disconnect(true);
-                    }
+                    using var client = new SmtpClient();
+                    client.Connect("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
+                    client.Authenticate("panwasalimsuwan@gmail.com", "xemtsrhrnzpddwjl");
+                    client.Send(message);
+                    client.Disconnect(true);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Error sending email: " + ex.Message);
-                    throw new Exception("Error sending email: " + ex.Message);
+                    Console.WriteLine("Email error: " + ex.Message);
+                    throw;
                 }
             }
+        }
+
+        // PUT: api/Assignment/{id}/return
+        // ToProcess กด → Completed ทันที + แจ้ง FromProcess
+        // FromProcess กด → Returning + แจ้ง ToProcess รอ Confirm
+        [HttpPut("{id:int}/return")]
+        public async Task<IActionResult> ReturnEmployee(
+            [FromRoute] int id,
+            [FromQuery] string callerSide
+        ) // "from" หรือ "to"
+        {
+            var assignment = await GetAssignmentById(id);
+            if (assignment == null)
+                return NotFound("Assignment not found.");
+            if (assignment.Status != "Active")
+                return BadRequest("Assignment is not Active.");
+
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            if (callerSide == "to")
+            {
+                // ToProcess กด → Completed ทันที
+                var sql =
+                    "UPDATE Assignment SET Status='Completed', EndAt=@endAt WHERE AssignmentID=@id";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+                await cmd.ExecuteNonQueryAsync();
+
+                // แจ้ง FromProcess ว่าพนักงานกลับมาแล้ว
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var fromEmail = await GetEmailFromAdminByProcess(
+                            assignment.FromBiz,
+                            assignment.FromProcess
+                        );
+                        if (!string.IsNullOrEmpty(fromEmail))
+                            EmailService.SendEmail(
+                                "panwasalimsuwan@gmail.com",
+                                $"[พนักงานกลับมาแล้ว] {assignment.EmpID} คืนจาก {assignment.ToProcess}",
+                                $"พนักงาน {assignment.EmpID} ได้กลับมายัง {assignment.FromProcess} / {assignment.FromBiz} แล้ว\n"
+                                    + $"คืนโดย: {assignment.ToProcess}"
+                            );
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Email error: {ex.Message}");
+                    }
+                });
+
+                return Ok(new { message = "Completed.", assignmentID = id });
+            }
+            else // callerSide == "from"
+            {
+                // FromProcess กด → Returning รอ ToProcess Confirm
+                var sql = "UPDATE Assignment SET Status='Returning' WHERE AssignmentID=@id";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+                await cmd.ExecuteNonQueryAsync();
+
+                // แจ้ง ToProcess ว่าถูกขอพนักงานคืน รอยืนยัน
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var toEmail = await GetEmailFromAdminByProcess(
+                            assignment.ToBiz,
+                            assignment.ToProcess
+                        );
+                        if (!string.IsNullOrEmpty(toEmail))
+                            EmailService.SendEmail(
+                                "panwasalimsuwan@gmail.com",
+                                $"[ขอคืนพนักงาน] {assignment.EmpID} จาก {assignment.FromProcess}",
+                                $"หัวหน้า {assignment.FromProcess} ขอคืนพนักงาน {assignment.EmpID}\n"
+                                    + $"กรุณาเข้า Dashboard เพื่อยืนยันการคืนพนักงาน"
+                            );
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Email error: {ex.Message}");
+                    }
+                });
+
+                return Ok(
+                    new
+                    {
+                        message = "Returning - waiting for ToProcess confirm.",
+                        assignmentID = id,
+                    }
+                );
+            }
+        }
+
+        // PUT: api/Assignment/{id}/confirm-return
+        // ToProcess กด "ยืนยันรับทราบ" → Completed
+        [HttpPut("{id:int}/confirm-return")]
+        public async Task<IActionResult> ConfirmReturn([FromRoute] int id)
+        {
+            var assignment = await GetAssignmentById(id);
+            if (assignment == null)
+                return NotFound("Assignment not found.");
+            if (assignment.Status != "Returning")
+                return BadRequest("Assignment is not in Returning state.");
+
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var sql =
+                "UPDATE Assignment SET Status='Completed', EndAt=@endAt WHERE AssignmentID=@id";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+            cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+            await cmd.ExecuteNonQueryAsync();
+
+            // แจ้ง FromProcess ว่า ToProcess ยืนยันแล้ว
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var fromEmail = await GetEmailFromAdminByProcess(
+                        assignment.FromBiz,
+                        assignment.FromProcess
+                    );
+                    if (!string.IsNullOrEmpty(fromEmail))
+                        EmailService.SendEmail(
+                            "panwasalimsuwan@gmail.com",
+                            $"[ยืนยันแล้ว] พนักงาน {assignment.EmpID} กลับมายัง {assignment.FromProcess}",
+                            $"{assignment.ToProcess} ยืนยันการคืนพนักงาน {assignment.EmpID} แล้ว\n"
+                                + $"พนักงานพร้อมกลับมายัง {assignment.FromProcess} / {assignment.FromBiz}"
+                        );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Email error: {ex.Message}");
+                }
+            });
+
+            return Ok(new { message = "Return confirmed. Completed.", assignmentID = id });
+        }
+
+        // ─── DTOs ───────────────────────────────────────────────────
+        public class AutoAssignRequest
+        {
+            public string Process { get; set; } = "";
+            public string? ToBiz { get; set; }
+            public string? SkillGroup { get; set; }
+            public DateTime WorkDate { get; set; }
+            public int HeadcountNeed { get; set; } = 1;
+        }
+
+        public class AutoAssignResult
+        {
+            public List<AutoAssignedEmployee> Assigned { get; set; } = new();
+            public int AssignedCount { get; set; }
+            public int RequestedCount { get; set; }
+            public int ShortfallCount { get; set; }
+            public string Message { get; set; } = "";
+        }
+
+        public class AutoAssignedEmployee
+        {
+            public int AssignmentID { get; set; }
+            public int EmpID { get; set; }
+            public string FirstName { get; set; } = "";
+            public string LastName { get; set; } = "";
+            public int TotalSkill { get; set; }
+            public double TotalTime { get; set; }
+        }
+
+        private class AutoCandidate
+        {
+            public int EmpID { get; set; }
+            public string FirstName { get; set; } = "";
+            public string LastName { get; set; } = "";
+            public int TotalSkill { get; set; }
+            public double TotalTime { get; set; }
+            public string? FromBiz { get; set; } // ✅ เพิ่ม
+            public string? FromProcess { get; set; } // ✅ เพิ่ม
         }
     }
 }

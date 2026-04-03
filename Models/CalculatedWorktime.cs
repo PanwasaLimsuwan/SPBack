@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Api.Models
 {
-    public class CalculatedWorktime
+    public class Worktime
     {
         [Key]
         public int WorktimeID { get; set; }

@@ -1,9 +1,10 @@
-using System;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using Api.Models;
+using System;
 
 namespace Api.Controllers
 {
@@ -18,85 +19,30 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
+        // ✅ Get All
         [HttpGet]
-        public async Task<IActionResult> GetWorktime(
-            [FromQuery] string division,
-            [FromQuery] string department,
-            [FromQuery] string section,
-            [FromQuery] string biz,
-            [FromQuery] string process
-        )
+        public async Task<IActionResult> GetAll()
         {
-            var results = new List<object>();
+            var results = new List<Worktime>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
 
-                // ✅ Query จาก CalculatedWorktime + Join EmployeeInfo
-                var query =
-                    @"
-                    SELECT 
-                        cw.WorktimeID,
-                        cw.EmpID,
-                        cw.Date,
-                        cw.OTHours,
-                        cw.Status,
-                        ei.Division,
-                        ei.Department,
-                        ei.Section,
-                        ei.Biz,
-                        ei.Process
-                    FROM CalculatedWorktime cw
-                    JOIN EmployeeInfo ei ON cw.EmpID = CAST(ei.EmpID AS VARCHAR)
-                    WHERE 1=1";
+                var cmd = new SqlCommand("SELECT WorktimeID, EmpID, Date, WorkedHours, OTHours, Status FROM Worktime", conn);
+                var reader = await cmd.ExecuteReaderAsync();
 
-                // ✅ Filter ตามที่รับมา
-                if (!string.IsNullOrEmpty(division))
-                    query += " AND ei.Division = @division";
-                if (!string.IsNullOrEmpty(department))
-                    query += " AND ei.Department = @department";
-                if (!string.IsNullOrEmpty(section))
-                    query += " AND ei.Section = @section";
-                if (!string.IsNullOrEmpty(biz))
-                    query += " AND ei.Biz = @biz";
-                if (!string.IsNullOrEmpty(process))
-                    query += " AND ei.Process = @process";
-
-                using (var cmd = new SqlCommand(query, conn))
+                while (await reader.ReadAsync())
                 {
-                    if (!string.IsNullOrEmpty(division))
-                        cmd.Parameters.AddWithValue("@division", division);
-                    if (!string.IsNullOrEmpty(department))
-                        cmd.Parameters.AddWithValue("@department", department);
-                    if (!string.IsNullOrEmpty(section))
-                        cmd.Parameters.AddWithValue("@section", section);
-                    if (!string.IsNullOrEmpty(biz))
-                        cmd.Parameters.AddWithValue("@biz", biz);
-                    if (!string.IsNullOrEmpty(process))
-                        cmd.Parameters.AddWithValue("@process", process);
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
+                    results.Add(new Worktime
                     {
-                        while (await reader.ReadAsync())
-                        {
-                            results.Add(
-                                new
-                                {
-                                    worktimeID = reader.GetInt32(0),
-                                    empID = Convert.ToInt32(reader["EmpID"]),
-                                    date = reader.GetDateTime(2),
-                                    otHours = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
-                                    status = reader["Status"]?.ToString(),
-                                    division = reader["Division"]?.ToString(),
-                                    department = reader["Department"]?.ToString(),
-                                    section = reader["Section"]?.ToString(),
-                                    biz = reader["Biz"]?.ToString(),
-                                    process = reader["Process"]?.ToString(),
-                                }
-                            );
-                        }
-                    }
+                        WorktimeID = reader.GetInt32(0),
+                        EmpID = reader.GetInt32(1),
+                        Date = reader.GetDateTime(2),
+                        WorkedHours = reader.GetDouble(3),
+                        OTHours = reader.GetDouble(4),
+                        Status = reader.GetString(5)
+                    });
                 }
             }
 

@@ -21,7 +21,7 @@
 //             "Assignment", "Attendance", "Cameras", "EICC_Control",
 //             "OJTandInspectionSkill", "HeadcountTransition", "ManpowerPlan",
 //             "ManpowerReq", "Skill", "Transactions", "Worktime", "EmployeeInfo",
-//             "CalculatedWorktime"
+//             "Worktime"
 //         };
 
 //         public DynamicChartController(IConfiguration configuration)
@@ -51,7 +51,7 @@
 //                         'Assignment', 'Attendance', 'Cameras', 'EICC_Control',
 //                         'OJTandInspectionSkill', 'HeadcountTransition', 'ManpowerPlan',
 //                         'ManpowerReq', 'Skill', 'Transactions', 'Worktime', 'EmployeeInfo',
-//                         'CalculatedWorktime'
+//                         'Worktime'
 //                     )
 //                     ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION";
 

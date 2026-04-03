@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
-using System;
 using Api.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Api.Controllers
 {
@@ -19,101 +19,221 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // ✅ GET: api/ManpowerReq (พร้อม Filter และ Join EmployeeInfo)
-// ✅ GET: api/ManpowerReq (พร้อม Filter)
-[HttpGet]
-public async Task<IActionResult> GetAll(
-    [FromQuery] string? division,
-    [FromQuery] string? department,
-    [FromQuery] string? section,
-    [FromQuery] string? biz,
-    [FromQuery] string? process
-)
-{
-    var result = new List<object>();
-
-    using (var conn = new SqlConnection(_connectionString))
-    {
-        await conn.OpenAsync();
-
-        var query = @"
-            SELECT 
-                m.MPRID,
-                m.Date,
-                m.Biz,
-                m.Process,
-                m.Require,
-                m.SkillGroup,
-                e.Division,
-                e.Department,
-                e.Section,
-                e.Biz AS EmployeeBiz,
-                e.Process AS EmployeeProcess
-            FROM ManpowerReq m
-            LEFT JOIN EmployeeInfo e ON m.Biz = e.Biz AND m.Process = e.Process
-            WHERE 1=1";
-
-        var parameters = new List<SqlParameter>();
-
-        if (!string.IsNullOrEmpty(biz))
+        // GET: api/ManpowerReq
+        [HttpGet]
+        public async Task<IActionResult> GetAll(
+            [FromQuery] string? division,
+            [FromQuery] string? department,
+            [FromQuery] string? section,
+            [FromQuery] string? biz,
+            [FromQuery] string? process
+        )
         {
-            query += " AND m.Biz = @Biz";
-            parameters.Add(new SqlParameter("@Biz", biz));
-        }
+            var result = new List<object>();
 
-        if (!string.IsNullOrEmpty(process))
-        {
-            query += " AND m.Process = @Process";
-            parameters.Add(new SqlParameter("@Process", process));
-        }
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
 
-        if (!string.IsNullOrEmpty(division))
-        {
-            query += " AND (e.Division = @Division OR e.Division IS NULL)";
-            parameters.Add(new SqlParameter("@Division", division));
-        }
+            var query = @"
+                SELECT DISTINCT
+                    m.MPRID,
+                    m.Date,
+                    m.Biz,
+                    m.Process,
+                    m.Require,
+                    m.SkillGroup,
+                    m.Present,
+                    m.Shortage,
+                    m.LastUpdateTime,
+                    (SELECT TOP 1 Division   FROM EmployeeInfo WHERE Biz = m.Biz AND Process = m.Process) AS Division,
+                    (SELECT TOP 1 Department FROM EmployeeInfo WHERE Biz = m.Biz AND Process = m.Process) AS Department,
+                    (SELECT TOP 1 Section    FROM EmployeeInfo WHERE Biz = m.Biz AND Process = m.Process) AS Section
+                FROM ManpowerReq m
+                WHERE 1=1";
 
-        if (!string.IsNullOrEmpty(department))
-        {
-            query += " AND (e.Department = @Department OR e.Department IS NULL)";
-            parameters.Add(new SqlParameter("@Department", department));
-        }
+            var parameters = new List<SqlParameter>();
 
-        if (!string.IsNullOrEmpty(section))
-        {
-            query += " AND (e.Section = @Section OR e.Section IS NULL)";
-            parameters.Add(new SqlParameter("@Section", section));
-        }
+            if (!string.IsNullOrEmpty(biz))
+            {
+                query += " AND m.Biz = @Biz";
+                parameters.Add(new SqlParameter("@Biz", biz));
+            }
+            if (!string.IsNullOrEmpty(process))
+            {
+                query += " AND m.Process = @Process";
+                parameters.Add(new SqlParameter("@Process", process));
+            }
 
-        using (var cmd = new SqlCommand(query, conn))
-        {
+            using var cmd = new SqlCommand(query, conn);
+            cmd.CommandTimeout = 30;
             cmd.Parameters.AddRange(parameters.ToArray());
 
-            using (var reader = await cmd.ExecuteReaderAsync())
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                while (await reader.ReadAsync())
+                result.Add(new
                 {
-                    result.Add(new
-                    {
-                        // mprID = reader["MPRID"]?.ToString(),
-                        mprID = reader.GetInt32(0),
-                        date = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
-                        biz = reader["Biz"]?.ToString(),
-                        process = reader["Process"]?.ToString(),
-                        require = reader["Require"] == DBNull.Value ? null : (int?)reader["Require"],
-                        skillGroup = reader["SkillGroup"]?.ToString(),
-                        division = reader["Division"]?.ToString(),
-                        department = reader["Department"]?.ToString(),
-                        section = reader["Section"]?.ToString(),
-                        employeeBiz = reader["EmployeeBiz"]?.ToString(),
-                        employeeProcess = reader["EmployeeProcess"]?.ToString()
-                    });
-                }
+                    mprID        = reader.GetInt32(reader.GetOrdinal("MPRID")),
+                    date         = reader["Date"] == DBNull.Value ? null : (DateTime?)reader["Date"],
+                    biz          = reader["Biz"]?.ToString(),
+                    process      = reader["Process"]?.ToString(),
+                    require      = reader["Require"]      == DBNull.Value ? null : (int?)reader["Require"],
+                    skillGroup   = reader["SkillGroup"]?.ToString(),
+                    present      = reader["Present"]      == DBNull.Value ? null : (int?)reader["Present"],
+                    shortage     = reader["Shortage"]     == DBNull.Value ? null : (int?)reader["Shortage"],
+                    lastUpdateTime = reader["LastUpdateTime"] == DBNull.Value ? null : (DateTime?)reader["LastUpdateTime"],
+                    division     = reader["Division"]?.ToString(),
+                    department   = reader["Department"]?.ToString(),
+                    section      = reader["Section"]?.ToString(),
+                });
             }
-        }
-    }
 
-    return Ok(result);
-}
+            return Ok(result);
+        }
+
+        // GET: api/ManpowerReq/latest
+        [HttpGet("latest")]
+        public async Task<IActionResult> GetLatest(
+            [FromQuery] string? division,
+            [FromQuery] string? department,
+            [FromQuery] string? section,
+            [FromQuery] string? biz,
+            [FromQuery] string? process,
+            [FromQuery] DateTime? workDate,   // ✅ เพิ่ม
+    [FromQuery] string? shiftCode     // ✅ เพิ่ม
+        )
+        {
+            var result = new List<object>();
+
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            // ✅ FIX: ใช้ JOIN แทน correlated subquery — เร็วกว่ามาก
+            // ✅ FIX: status ในระบบจริงคือ Normal/Late/Absent ไม่ใช่ Present
+            //         นับ "ขาด" = Absent เท่านั้น
+            var query = @"
+                -- pre-aggregate absent count ก่อน แล้วค่อย join
+                WITH LatestDate AS (
+                    SELECT MAX(Date) AS MaxDate FROM ManpowerReq
+                ),
+                AbsentCount AS (
+                    SELECT
+                        ei.Biz,
+                        ei.Process,
+                        COUNT(*) AS AbsentTotal
+                    FROM Attendance a
+                    JOIN EmployeeInfo ei ON a.EmpID = ei.EmpID
+                    WHERE CAST(a.Date AS DATE) = (SELECT CAST(MaxDate AS DATE) FROM LatestDate)
+                    AND a.Status = 'Absent'
+                    GROUP BY ei.Biz, ei.Process
+                ),
+                AssignedCount AS (
+    SELECT
+        ToProcess AS Process,
+        ToBiz     AS Biz,
+        COUNT(*)  AS AssignedTotal
+    FROM Assignment
+    WHERE Status IN ('Active', 'Returning')
+    GROUP BY ToProcess, ToBiz
+)
+                SELECT DISTINCT
+                    m.Date        AS WorkDate,
+                    m.Biz,
+                    m.Process,
+                    m.SkillGroup,
+                    m.Require     AS Required,
+                    m.Present,
+                    m.Shortage,
+                    m.LastUpdateTime,
+                    e.Division,
+                    e.Department,
+                    e.Section,
+                    CASE
+    WHEN ISNULL(ac.AbsentTotal, 0) - ISNULL(asgn.AssignedTotal, 0) < 0 THEN 0
+    ELSE ISNULL(ac.AbsentTotal, 0) - ISNULL(asgn.AssignedTotal, 0)
+END AS HeadcountShortage
+                FROM ManpowerReq m
+                JOIN LatestDate ld ON m.Date = ld.MaxDate
+                LEFT JOIN (
+                    SELECT DISTINCT Biz, Process, Division, Department, Section
+                    FROM EmployeeInfo
+                ) e ON m.Biz = e.Biz AND m.Process = e.Process
+                LEFT JOIN AbsentCount ac
+                    ON m.Biz = ac.Biz AND m.Process = ac.Process
+                LEFT JOIN AssignedCount asgn
+    ON m.Biz = asgn.Biz AND m.Process = asgn.Process
+                WHERE 1=1";
+
+            var parameters = new List<SqlParameter>();
+
+            if (!string.IsNullOrEmpty(biz))
+            {
+                query += " AND m.Biz = @Biz";
+                parameters.Add(new SqlParameter("@Biz", biz));
+            }
+            if (!string.IsNullOrEmpty(process))
+            {
+                query += " AND m.Process = @Process";
+                parameters.Add(new SqlParameter("@Process", process));
+            }
+            if (!string.IsNullOrEmpty(division))
+            {
+                query += " AND e.Division = @Division";
+                parameters.Add(new SqlParameter("@Division", division));
+            }
+            if (!string.IsNullOrEmpty(department))
+            {
+                query += " AND e.Department = @Department";
+                parameters.Add(new SqlParameter("@Department", department));
+            }
+            if (!string.IsNullOrEmpty(section))
+            {
+                query += " AND e.Section = @Section";
+                parameters.Add(new SqlParameter("@Section", section));
+            }
+
+            query += " ORDER BY m.Process, m.SkillGroup";
+
+            using var cmd = new SqlCommand(query, conn);
+            cmd.CommandTimeout = 60;
+            cmd.Parameters.AddRange(parameters.ToArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                result.Add(new
+                {
+                    workDate = reader["WorkDate"] == DBNull.Value
+                        ? null : (DateTime?)reader["WorkDate"],
+
+                    biz           = reader["Biz"]?.ToString(),
+                    process       = reader["Process"]?.ToString(),
+                    skillGroup    = reader["SkillGroup"]?.ToString(),
+
+                    required = reader["Required"] == DBNull.Value
+                        ? 0 : Convert.ToInt32(reader["Required"]),
+
+                    present = reader["Present"] == DBNull.Value
+                        ? 0 : Convert.ToInt32(reader["Present"]),
+
+                    shortage = reader["Shortage"] == DBNull.Value
+                        ? 0 : Convert.ToInt32(reader["Shortage"]),
+
+                    // ✅ นับจาก Attendance จริง (Absent = ขาด)
+                    headcountShortage = reader["HeadcountShortage"] == DBNull.Value
+                        ? 0 : Convert.ToInt32(reader["HeadcountShortage"]),
+
+                    lastUpdateTime = reader["LastUpdateTime"] == DBNull.Value
+                        ? null : (DateTime?)reader["LastUpdateTime"],
+
+                    division   = reader["Division"]?.ToString(),
+                    department = reader["Department"]?.ToString(),
+                    section    = reader["Section"]?.ToString(),
+                });
+            }
+
+            return Ok(result);
+        }
     }
 }

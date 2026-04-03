@@ -132,150 +132,228 @@
 //     }
 // }
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
+// using System;
+// using System.Collections.Generic;
+// using System.Threading.Tasks;
+// using Microsoft.AspNetCore.Mvc;
+// using Microsoft.Data.SqlClient;
 
-namespace Api.Controllers
-{
-    [ApiController]
-    [Route("api/[controller]")]
-    public class CalculatedAttendance : ControllerBase
-    {
-        private readonly IConfiguration _configuration;
+// namespace Api.Controllers
+// {
+//     [ApiController]
+//     [Route("api/[controller]")]
+//     public class CalculatedAttendance : ControllerBase
+//     {
+//         private readonly IConfiguration _configuration;
 
-        public CalculatedAttendance(IConfiguration configuration)
-        {
-            _configuration = configuration;
-        }
+//         public CalculatedAttendance(IConfiguration configuration)
+//         {
+//             _configuration = configuration;
+//         }
 
-        [HttpPost("GenerateAttendance")]
-        public async Task<IActionResult> GenerateAttendance([FromQuery] DateTime? date)
-        {
-            using (
-                var conn = new SqlConnection(
-                    _configuration.GetConnectionString("DefaultConnection")
-                )
-            )
-            {
-                await conn.OpenAsync();
+//         [HttpPost("GenerateAttendance")]
+//         public async Task<IActionResult> GenerateAttendance([FromQuery] DateTime? date)
+//         {
+//             using (
+//                 var conn = new SqlConnection(
+//                     _configuration.GetConnectionString("DefaultConnection")
+//                 )
+//             )
+//             {
+//                 await conn.OpenAsync();
 
-                DateTime selectedDate = date?.Date ?? DateTime.Now.Date;
-                DateTime dateStart = selectedDate;
-                DateTime dateEnd = selectedDate.AddDays(1).AddSeconds(-1);
+//                 DateTime selectedDate = date?.Date ?? DateTime.Now.Date;
+//                 DateTime dateStart = selectedDate;
+//                 DateTime dateEnd = selectedDate.AddDays(1).AddSeconds(-1);
 
-                async Task InsertAttendance(string status, string query)
-                {
-                    var empIDs = new List<int>();
+//                 async Task InsertAttendance(string status, string query)
+//                 {
+//                     var empIDs = new List<int>();
 
-                    using (var cmd = new SqlCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@dateStart", dateStart);
-                        cmd.Parameters.AddWithValue("@dateEnd", dateEnd);
+//                     using (var cmd = new SqlCommand(query, conn))
+//                     {
+//                         cmd.Parameters.AddWithValue("@dateStart", dateStart);
+//                         cmd.Parameters.AddWithValue("@dateEnd", dateEnd);
 
-                        using (var reader = await cmd.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                empIDs.Add(Convert.ToInt32(reader["EmpID"]));
-                            }
-                        }
-                    }
+//                         using (var reader = await cmd.ExecuteReaderAsync())
+//                         {
+//                             while (await reader.ReadAsync())
+//                             {
+//                                 empIDs.Add(Convert.ToInt32(reader["EmpID"]));
+//                             }
+//                         }
+//                     }
 
-                    foreach (var empID in empIDs)
-                    {
-                        // ตรวจสอบว่าใน Attendance มีข้อมูลที่ตรงกับ EmpID, Date และ Status หรือไม่
-                        var checkCmd = new SqlCommand(
-                            @"
-                            SELECT COUNT(1) FROM Attendance 
-                            WHERE EmpID = @empID AND Date = @date AND Status = @status
-                        ",
-                            conn
-                        );
-                        checkCmd.Parameters.AddWithValue("@empID", empID);
-                        checkCmd.Parameters.AddWithValue("@date", selectedDate);
-                        checkCmd.Parameters.AddWithValue("@status", status);
+//                     foreach (var empID in empIDs)
+//                     {
+//                         // ตรวจสอบว่าใน Attendance มีข้อมูลที่ตรงกับ EmpID, Date และ Status หรือไม่
+//                         var checkCmd = new SqlCommand(
+//                             @"
+//                             SELECT COUNT(1) FROM Attendance 
+//                             WHERE EmpID = @empID AND Date = @date AND Status = @status
+//                         ",
+//                             conn
+//                         );
+//                         checkCmd.Parameters.AddWithValue("@empID", empID);
+//                         checkCmd.Parameters.AddWithValue("@date", selectedDate);
+//                         checkCmd.Parameters.AddWithValue("@status", status);
 
-                        var count = (int)await checkCmd.ExecuteScalarAsync();
+//                         var count = (int)await checkCmd.ExecuteScalarAsync();
 
-                        // ถ้าจำนวนแถวที่พบเป็น 0 ให้ทำการ insert
-                        if (count == 0)
-                        {
-                            var insertCmd = new SqlCommand(
-                                @"
-                                INSERT INTO Attendance (EmpID, Date, Status)
-                                VALUES (@empID, @date, @status)
-                            ",
-                                conn
-                            );
-                            insertCmd.Parameters.AddWithValue("@empID", empID);
-                            insertCmd.Parameters.AddWithValue("@date", selectedDate);
-                            insertCmd.Parameters.AddWithValue("@status", status);
+//                         // ถ้าจำนวนแถวที่พบเป็น 0 ให้ทำการ insert
+//                         if (count == 0)
+//                         {
+//                             var insertCmd = new SqlCommand(
+//                                 @"
+//                                 INSERT INTO Attendance (EmpID, Date, Status)
+//                                 VALUES (@empID, @date, @status)
+//                             ",
+//                                 conn
+//                             );
+//                             insertCmd.Parameters.AddWithValue("@empID", empID);
+//                             insertCmd.Parameters.AddWithValue("@date", selectedDate);
+//                             insertCmd.Parameters.AddWithValue("@status", status);
 
-                            await insertCmd.ExecuteNonQueryAsync();
-                        }
-                    }
-                }
+//                             await insertCmd.ExecuteNonQueryAsync();
+//                         }
+//                     }
+//                 }
 
-                // Query สำหรับการสร้างสถานะต่าง ๆ
+//                 // Query สำหรับการสร้างสถานะต่าง ๆ
 
-                // Generate absent
-                await InsertAttendance(
-                    "absent",
-                    @"
-    SELECT e.EmpID
-    FROM EmployeeInfo e
-    WHERE NOT EXISTS (
-        SELECT 1 FROM Transactions t
-        WHERE t.EmpID = e.EmpID
-        AND CAST(t.Timestamp AS DATE) BETWEEN @dateStart AND @dateEnd
-    )
-"
-                );
+//                 // Generate absent
+//                 await InsertAttendance(
+//                     "absent",
+//                     @"
+//     SELECT e.EmpID
+//     FROM EmployeeInfo e
+//     WHERE NOT EXISTS (
+//         SELECT 1 FROM Transactions t
+//         WHERE t.EmpID = e.EmpID
+//         AND CAST(t.Timestamp AS DATE) BETWEEN @dateStart AND @dateEnd
+//     )
+// "
+//                 );
 
-                // Generate late (หลัง 07:15 หรือ 19:15)
-                await InsertAttendance(
-                    "late",
-                    @"
-                    SELECT DISTINCT t.EmpID
-                    FROM Transactions t
-                    WHERE t.Timestamp BETWEEN @dateStart AND @dateEnd
-                    AND (
-                        CAST(t.Timestamp AS TIME) > '07:15:00' OR 
-                        CAST(t.Timestamp AS TIME) > '19:15:00'
-                    )
-                "
-                );
+//                 // Generate late (หลัง 07:15 หรือ 19:15)
+//                 await InsertAttendance(
+//                     "late",
+//                     @"
+//                     SELECT DISTINCT t.EmpID
+//                     FROM Transactions t
+//                     WHERE t.Timestamp BETWEEN @dateStart AND @dateEnd
+//                     AND (
+//                         CAST(t.Timestamp AS TIME) > '07:15:00' OR 
+//                         CAST(t.Timestamp AS TIME) > '19:15:00'
+//                     )
+//                 "
+//                 );
 
-                // Generate normal (ก่อนเวลา 07:15 หรือ 19:15)
-                await InsertAttendance(
-                    "normal",
-                    @"
-                    SELECT DISTINCT t.EmpID
-                    FROM Transactions t
-                    WHERE t.Timestamp BETWEEN @dateStart AND @dateEnd
-                    AND (
-                        CAST(t.Timestamp AS TIME) <= '07:15:00' OR 
-                        CAST(t.Timestamp AS TIME) <= '19:15:00'
-                    )
-                "
-                );
+//                 // Generate normal (ก่อนเวลา 07:15 หรือ 19:15)
+//                 await InsertAttendance(
+//                     "normal",
+//                     @"
+//                     SELECT DISTINCT t.EmpID
+//                     FROM Transactions t
+//                     WHERE t.Timestamp BETWEEN @dateStart AND @dateEnd
+//                     AND (
+//                         CAST(t.Timestamp AS TIME) <= '07:15:00' OR 
+//                         CAST(t.Timestamp AS TIME) <= '19:15:00'
+//                     )
+//                 "
+//                 );
 
-                // Generate status-missing สำหรับข้อมูลที่ไม่มี Transaction (EntryDateTime)
-                // await InsertAttendance("status-missing", @"
-                //     SELECT e.EmpID
-                //     FROM EmployeeInfo e
-                //     WHERE NOT EXISTS (
-                //         SELECT 1 FROM Transactions t
-                //         WHERE t.EmpID = e.EmpID
-                //         AND CAST(t.Timestamp AS DATE) BETWEEN @dateStart AND @dateEnd
-                //     )
-                // ");
-            }
+//                 // Generate status-missing สำหรับข้อมูลที่ไม่มี Transaction (EntryDateTime)
+//                 // await InsertAttendance("status-missing", @"
+//                 //     SELECT e.EmpID
+//                 //     FROM EmployeeInfo e
+//                 //     WHERE NOT EXISTS (
+//                 //         SELECT 1 FROM Transactions t
+//                 //         WHERE t.EmpID = e.EmpID
+//                 //         AND CAST(t.Timestamp AS DATE) BETWEEN @dateStart AND @dateEnd
+//                 //     )
+//                 // ");
+//             }
 
-            return Ok(new { message = "Attendance generation completed." });
-        }
-    }
-}
+//             return Ok(new { message = "Attendance generation completed." });
+//         }
+//     }
+// }
+
+// using System;
+// using System.Threading.Tasks;
+// using Microsoft.AspNetCore.Mvc;
+// using Microsoft.Data.SqlClient;
+
+// namespace Api.Controllers
+// {
+//     [ApiController]
+//     [Route("api/[controller]")]
+//     public class CalculatedAttendance : ControllerBase
+//     {
+//         private readonly IConfiguration _configuration;
+
+//         public CalculatedAttendance(IConfiguration configuration)
+//         {
+//             _configuration = configuration;
+//         }
+
+//         [HttpPost("GenerateAttendance")]
+//         public async Task<IActionResult> GenerateAttendance([FromQuery] DateTime? date)
+//         {
+//             DateTime selectedDate = date?.Date ?? DateTime.Now.Date;
+//             DateTime dateStart = selectedDate;
+//             DateTime dateEnd = selectedDate.AddDays(1);
+
+//             using var conn = new SqlConnection(
+//                 _configuration.GetConnectionString("DefaultConnection")
+//             );
+
+//             await conn.OpenAsync();
+
+//             var cmd = new SqlCommand(@"
+
+// ;WITH DailyTx AS (
+//     SELECT 
+//         EmpID,
+//         MIN(CASE WHEN CAST(Timestamp AS TIME) BETWEEN '05:00' AND '11:59' THEN Timestamp END) AS FirstIn,
+//         MAX(CASE WHEN CameraID = 1 THEN Timestamp END) AS LastOut
+//     FROM Transactions
+//     WHERE Timestamp >= @dateStart
+//       AND Timestamp < @dateEnd
+//     GROUP BY EmpID
+// )
+
+// INSERT INTO Attendance (EmpID, Date, Status)
+// SELECT 
+//     e.EmpID,
+//     @dateStart,
+//     CASE
+//         WHEN d.EmpID IS NULL THEN 'absent'
+//         WHEN d.LastOut IS NOT NULL 
+//              AND CAST(d.LastOut AS TIME) < '16:00:00' THEN 'half-day'
+//         WHEN d.FirstIn IS NOT NULL 
+//              AND CAST(d.FirstIn AS TIME) > '07:15:00' THEN 'late'
+//         WHEN d.LastOut IS NOT NULL 
+//              AND CAST(d.LastOut AS TIME) >= '20:00:00' THEN 'ot'
+//         ELSE 'normal'
+//     END AS Status
+// FROM EmployeeInfo e
+// LEFT JOIN DailyTx d ON e.EmpID = d.EmpID
+// WHERE NOT EXISTS (
+//     SELECT 1 FROM Attendance a
+//     WHERE a.EmpID = e.EmpID
+//       AND a.Date = @dateStart
+// )
+
+// ", conn);
+
+//             cmd.Parameters.AddWithValue("@dateStart", dateStart);
+//             cmd.Parameters.AddWithValue("@dateEnd", dateEnd);
+
+//             await cmd.ExecuteNonQueryAsync();
+
+//             return Ok(new { message = "Attendance generated (Production Version)." });
+//         }
+//     }
+// }

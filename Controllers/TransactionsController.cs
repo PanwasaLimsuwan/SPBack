@@ -48,13 +48,13 @@ namespace Api.Controllers
 
         // GET: api/Transactions/GetFaceEntry (รวมคนขาดงานด้วย)
         [HttpGet("GetFaceEntry")]
-        public async Task<IActionResult> GetFaceEntry(
+        public async Task<IActionResult> GetFaceEntryLatest(
             [FromQuery] string? division,
             [FromQuery] string? department,
             [FromQuery] string? section,
             [FromQuery] string? biz,
             [FromQuery] string? process,
-            [FromQuery] DateTime? date
+            [FromQuery] string? shiftOverride
         )
         {
             var result = new List<object>();
@@ -63,65 +63,252 @@ namespace Api.Controllers
             {
                 await conn.OpenAsync();
 
-                // หาวันที่ล่าสุดจาก Transactions
+                // ✅ Step 1: หา workDate และ activeShift จากเวลาปัจจุบัน
+                //             DateTime now = DateTime.Now;
+                //             DateTime selectedDate;
+                //             string selectedShift;
+                //             string shiftType;
+
+                //             // กำหนด active shift จากเวลาปัจจุบัน
+                //             // กะ A (DAY)   = 07:00 - 19:00
+                //             // กะ B/C (NIGHT) = 19:00 - 07:00 ของวันถัดไป
+                //             bool isDayShift = now.Hour >= 7 && now.Hour < 19;
+
+                //             if (isDayShift)
+                //             {
+                //                 // กะกลางวัน
+                //                 selectedDate = now.Date;
+                //                 shiftType = "DAY";
+
+                //                 // หา ShiftCode ของกะกลางวันจาก EmployeeInfo
+                //                 // ที่มี Transaction วันนี้มากที่สุดในช่วง 07:00-19:00
+                //                 using (
+                //                     var cmd = new SqlCommand(
+                //                         @"
+                //     SELECT TOP 1 e.ShiftCode
+                //     FROM Transactions t
+                //     JOIN EmployeeInfo e ON t.EmpID = e.EmpID
+                //     WHERE t.Timestamp BETWEEN @start AND @end
+                //     GROUP BY e.ShiftCode
+                //     ORDER BY COUNT(*) DESC
+                // ",
+                //                         conn
+                //                     )
+                //                 )
+                //                 {
+                //                     cmd.Parameters.AddWithValue("@start", now.Date.AddHours(7));
+                //                     cmd.Parameters.AddWithValue("@end", now.Date.AddHours(19));
+                //                     var r = await cmd.ExecuteScalarAsync();
+                //                     selectedShift = r?.ToString() ?? "A";
+                //                 }
+                //             }
+                //             else
+                //             {
+                //                 // กะดึก — workDate คือวันที่กะเริ่ม
+                //                 // ถ้าตอนนี้ 19:00-23:59 → กะเริ่มวันนี้
+                //                 // ถ้าตอนนี้ 00:00-06:59 → กะเริ่มเมื่อวาน
+                //                 selectedDate = now.Hour >= 19 ? now.Date : now.Date.AddDays(-1);
+                //                 shiftType = "NIGHT";
+
+                //                 DateTime nightStart = selectedDate.AddHours(19);
+                //                 DateTime nightEnd = selectedDate.AddDays(1).AddHours(7);
+
+                //                 using (
+                //                     var cmd = new SqlCommand(
+                //                         @"
+                //     SELECT TOP 1 e.ShiftCode
+                //     FROM Transactions t
+                //     JOIN EmployeeInfo e ON t.EmpID = e.EmpID
+                //     WHERE t.Timestamp BETWEEN @start AND @end
+                //     GROUP BY e.ShiftCode
+                //     ORDER BY COUNT(*) DESC
+                // ",
+                //                         conn
+                //                     )
+                //                 )
+                //                 {
+                //                     cmd.Parameters.AddWithValue("@start", nightStart);
+                //                     cmd.Parameters.AddWithValue("@end", nightEnd);
+                //                     var r = await cmd.ExecuteScalarAsync();
+                //                     selectedShift = r?.ToString() ?? "C";
+                //                 }
+                //             }
+
+                //             // ✅ ถ้าส่ง shiftOverride มา ให้ override ทับ
+                //             if (!string.IsNullOrEmpty(shiftOverride))
+                //             {
+                //                 selectedShift = shiftOverride;
+                //                 // หา shiftType จาก ManpowerPlan
+                //                 using (
+                //                     var cmd = new SqlCommand(
+                //                         @"
+                //     SELECT TOP 1 Shift
+                //     FROM ManpowerPlan
+                //     WHERE CAST([Date] AS DATE) = @date AND ShiftCode = @code
+                // ",
+                //                         conn
+                //                     )
+                //                 )
+                //                 {
+                //                     cmd.Parameters.AddWithValue("@date", selectedDate);
+                //                     cmd.Parameters.AddWithValue("@code", selectedShift);
+                //                     var r = await cmd.ExecuteScalarAsync();
+                //                     shiftType = r?.ToString() ?? shiftType;
+                //                 }
+                //             }
+
+                //             // ✅ Step 2 (เดิม): คำนวณ time window — ใช้ shiftType ที่ได้มาแล้ว
+                //             DateTime startTime,
+                //                 endTime;
+                //             if (shiftType == "DAY")
+                //             {
+                //                 startTime = selectedDate.AddHours(7);
+                //                 endTime = selectedDate.AddHours(19);
+                //             }
+                //             else
+                //             {
+                //                 startTime = selectedDate.AddHours(19);
+                //                 endTime = selectedDate.AddDays(1).AddHours(7);
+                //             }
+
+                // ✅ Step 1: หา Timestamp ล่าสุดจาก Transactions
                 DateTime selectedDate;
-                var latestDateQuery =
-                    "SELECT TOP 1 CAST(Timestamp AS DATE) AS LatestDate FROM Transactions ORDER BY Timestamp DESC";
+                string shiftType;
+                string selectedShift;
 
-                // กำหนดวันที่
-                // DateTime selectedDate = date?.Date ?? DateTime.Now.Date;
-
-                using (var cmd = new SqlCommand(latestDateQuery, conn))
+                using (
+                    var cmd = new SqlCommand(
+                        @"
+    SELECT TOP 1 t.Timestamp, e.ShiftCode
+    FROM Transactions t
+    JOIN EmployeeInfo e ON t.EmpID = e.EmpID
+    ORDER BY t.Timestamp DESC
+",
+                        conn
+                    )
+                )
                 {
-                    var latestDateResult = await cmd.ExecuteScalarAsync();
-                    if (latestDateResult == DBNull.Value || latestDateResult == null)
+                    using var r = await cmd.ExecuteReaderAsync();
+                    if (!await r.ReadAsync())
                     {
-                        return Ok(result); // ถ้าไม่พบข้อมูลในตาราง Transactions
+                        // ไม่มีข้อมูลเลย fallback วันนี้
+                        selectedDate = DateTime.Now.Date;
+                        selectedShift = "A";
+                        shiftType = "DAY";
                     }
+                    else
+                    {
+                        var ts = Convert.ToDateTime(r["Timestamp"]);
+                        var shiftCode = r["ShiftCode"]?.ToString() ?? "A";
 
-                    selectedDate = (DateTime)latestDateResult; // ใช้วันที่ล่าสุด
+                        if (shiftCode == "A")
+                        {
+                            // กะกลางวัน → workDate = วันที่ Transaction นั้น
+                            selectedDate = ts.Date;
+                            shiftType = "DAY";
+                            selectedShift = "A";
+                        }
+                        else
+                        {
+                            // กะดึก B/C → ถ้า Timestamp อยู่ 00:00-18:59
+                            // แปลว่ายังอยู่ในกะดึกของวันก่อนหน้า
+                            selectedDate = ts.Hour < 19 ? ts.Date.AddDays(-1) : ts.Date;
+                            shiftType = "NIGHT";
+                            selectedShift = shiftCode;
+                        }
+                    }
                 }
 
-                // 🎯 Query ใหม่: LEFT JOIN จาก EmployeeInfo เพื่อแสดงทั้งคนมาและคนไม่มา
+                // ✅ ถ้า Frontend ส่ง shiftOverride มา ให้ override
+                if (!string.IsNullOrEmpty(shiftOverride))
+                {
+                    selectedShift = shiftOverride;
+                    using (
+                        var cmd = new SqlCommand(
+                            @"
+        SELECT TOP 1 Shift 
+        FROM ManpowerPlan 
+        WHERE CAST([Date] AS DATE) = @date AND ShiftCode = @code
+    ",
+                            conn
+                        )
+                    )
+                    {
+                        cmd.Parameters.AddWithValue("@date", selectedDate);
+                        cmd.Parameters.AddWithValue("@code", selectedShift);
+                        var r = await cmd.ExecuteScalarAsync();
+                        shiftType = r?.ToString() ?? shiftType;
+                    }
+                }
+
+                // ✅ Step 2: คำนวณ time window
+                DateTime startTime,
+                    endTime;
+                if (shiftType == "DAY")
+                {
+                    startTime = selectedDate.AddHours(7);
+                    endTime = selectedDate.AddHours(19);
+                }
+                else // NIGHT
+                {
+                    startTime = selectedDate.AddHours(19);
+                    endTime = selectedDate.AddDays(1).AddHours(7);
+                }
+                // ✅ Step 3: คำนวณ time window
+                // DateTime startTime,
+                //     endTime;
+                // if (shiftType == "DAY")
+                // {
+                //     startTime = selectedDate.AddHours(7);
+                //     endTime = selectedDate.AddHours(19);
+                // }
+                // else // NIGHT
+                // {
+                //     startTime = selectedDate.AddHours(19);
+                //     endTime = selectedDate.AddDays(1).AddHours(7);
+                // }
+
+                // ✅ Step 4: Query พนักงาน
                 var query =
                     @"
-                SELECT 
-                    e.EmpID,
-                    e.FirstName, 
-                    e.LastName, 
-                    e.Division, 
-                    e.Department, 
-                    e.Position, 
-                    e.Email, 
-                    e.ShiftCode, 
-                    e.Section,
-                    e.Biz, 
-                    e.Process,
-                    MIN(t.Timestamp) AS EntryDateTime,
-                    MAX(t.Timestamp) AS ExitDateTime,
-                    COUNT(t.TransacID) AS RecordCount,
-                    (SELECT TOP 1 t2.CameraID 
-                     FROM Transactions t2 
-                     WHERE t2.EmpID = e.EmpID 
-                       AND CAST(t2.Timestamp AS DATE) = @selectedDate
-                     ORDER BY t2.Timestamp DESC) AS LastCameraID
-                FROM EmployeeInfo e
-                LEFT JOIN Transactions t ON e.EmpID = t.EmpID 
-                    AND CAST(t.Timestamp AS DATE) = @selectedDate
-                WHERE (@division IS NULL OR e.Division = @division)
-                    AND (@department IS NULL OR e.Department = @department)
-                    AND (@section IS NULL OR e.Section = @section)
-                    AND (@biz IS NULL OR COALESCE(e.Biz, '') = @biz)
-                    AND (@process IS NULL OR COALESCE(e.Process, '') = @process)
-                GROUP BY 
-                    e.EmpID, e.FirstName, e.LastName, e.Division, e.Department,
-                    e.Position, e.Email, e.ShiftCode, e.Section, e.Biz, e.Process
-                ORDER BY e.EmpID";
+            SELECT 
+                e.EmpID,
+                e.FirstName, 
+                e.LastName,
+                e.Division,
+                e.Department,
+                e.Section,
+                e.Biz,
+                e.Process,
+                MIN(t.Timestamp) AS EntryDateTime,
+                MAX(t.Timestamp) AS ExitDateTime,
+                COUNT(t.TransacID) AS RecordCount,
+                (
+                    SELECT TOP 1 t2.CameraID 
+                    FROM Transactions t2 
+                    WHERE t2.EmpID = e.EmpID 
+                      AND t2.Timestamp BETWEEN @startTime AND @endTime
+                    ORDER BY t2.Timestamp DESC
+                ) AS LastCameraID
+            FROM EmployeeInfo e
+            LEFT JOIN Transactions t 
+                ON e.EmpID = t.EmpID 
+                AND t.Timestamp BETWEEN @startTime AND @endTime
+            WHERE e.ShiftCode = @shift
+                AND (@division   IS NULL OR e.Division   = @division)
+                AND (@department IS NULL OR e.Department = @department)
+                AND (@section    IS NULL OR e.Section    = @section)
+                AND (@biz        IS NULL OR COALESCE(e.Biz, '')     = @biz)
+                AND (@process    IS NULL OR COALESCE(e.Process, '') = @process)
+            GROUP BY e.EmpID, e.FirstName, e.LastName,
+                     e.Division, e.Department, e.Section, e.Biz, e.Process
+            ORDER BY e.EmpID";
 
                 using (var cmd = new SqlCommand(query, conn))
                 {
-                    // เพิ่มพารามิเตอร์
-                    cmd.Parameters.AddWithValue("@selectedDate", selectedDate);
+                    cmd.Parameters.AddWithValue("@startTime", startTime);
+                    cmd.Parameters.AddWithValue("@endTime", endTime);
+                    cmd.Parameters.AddWithValue("@shift", selectedShift);
                     cmd.Parameters.AddWithValue("@division", (object?)division ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@department", (object?)department ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@section", (object?)section ?? DBNull.Value);
@@ -132,7 +319,6 @@ namespace Api.Controllers
                     {
                         while (await reader.ReadAsync())
                         {
-                            var empID = Convert.ToInt32(reader["EmpID"]);
                             var recordCount = Convert.ToInt32(reader["RecordCount"]);
                             var lastCameraID =
                                 reader["LastCameraID"] != DBNull.Value
@@ -141,83 +327,69 @@ namespace Api.Controllers
 
                             var entryDateTime =
                                 reader["EntryDateTime"] == DBNull.Value
-                                    ? (DateTime?)null
-                                    : (DateTime)reader["EntryDateTime"];
+                                    ? null
+                                    : ((DateTime)reader["EntryDateTime"]).ToString(
+                                        "yyyy-MM-dd HH:mm:ss"
+                                    );
+
+                            DateTime? exitTime =
+                                reader["ExitDateTime"] == DBNull.Value
+                                    ? null
+                                    : (DateTime?)reader["ExitDateTime"];
 
                             var exitDateTime =
-                                recordCount > 1 && reader["ExitDateTime"] != DBNull.Value
-                                    ? (DateTime?)reader["ExitDateTime"]
+                                recordCount > 1 && exitTime.HasValue
+                                    ? exitTime.Value.ToString("yyyy-MM-dd HH:mm:ss")
                                     : null;
 
-                            // 🎯 กำหนด status
+                            // ✅ Status logic
                             string status;
-                            if (recordCount == 0 || !entryDateTime.HasValue)
-                            {
-                                // ไม่มี transaction เลย = ขาดงาน
+                            if (recordCount == 0)
                                 status = "status-missing";
-                            }
-                            else if (recordCount == 1)
-                            {
-                                // มี 1 record = เพิ่งเข้ามา
-                                // เพิ่มเงื่อนไข: ถ้ากล้องที่บันทึกไม่ใช่ CameraID 3
-                                if (lastCameraID != 3)
-                                {
-                                    status = "status-in-cleanroom"; // เปลี่ยนเป็น status-in-cleanroom
-                                }
-                                else
-                                {
-                                    status = "status-out-cleanroom"; // ถ้าเป็น CameraID 3
-                                }
-                            }
+                            else if (lastCameraID == 3)
+                                status = "status-in-cleanroom";
+                            else if (lastCameraID == 2)
+                                status = "status-out-cleanroom";
+                            else if (lastCameraID == 1)
+                                status = "status-get-off";
                             else
-                            {
-                                // มีมากกว่า 1 record = ดูจาก CameraID ล่าสุด
-                                status =
-                                    (lastCameraID == 1 && recordCount % 2 == 0)
-                                        ? "status-get-off"
-                                        : "status-in-cleanroom";
-                                // ถ้ามีหลายรายการ = ดูจาก CameraID ล่าสุด
-                                if (lastCameraID == 2)
-                                {
-                                    status = "status-out-cleanroom"; // ถ้ากล้องที่บันทึกคือ CameraID = 2
-                                }
-                                else if (lastCameraID == 3)
-                                {
-                                    status = "status-in-cleanroom"; // ถ้ากล้องที่บันทึกคือ CameraID = 3
-                                }
-                                else
-                                {
-                                    status = "status-get-off"; // ถ้ากล้องเป็นค่าอื่นๆ
-                                }
-                            }
+                                status = "status-missing";
 
                             result.Add(
                                 new
                                 {
-                                    empID = empID,
+                                    empID = reader["EmpID"],
                                     firstName = reader["FirstName"]?.ToString(),
                                     lastName = reader["LastName"]?.ToString(),
                                     division = reader["Division"]?.ToString(),
                                     department = reader["Department"]?.ToString(),
-                                    position = reader["Position"]?.ToString(),
-                                    email = reader["Email"]?.ToString(),
-                                    shiftCode = reader["ShiftCode"]?.ToString(),
                                     section = reader["Section"]?.ToString(),
                                     biz = reader["Biz"]?.ToString(),
                                     process = reader["Process"]?.ToString(),
-                                    entryDateTime = entryDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
-                                    exitDateTime = exitDateTime?.ToString("yyyy-MM-dd HH:mm:ss"),
-                                    recordCount = recordCount,
-                                    lastCameraID = lastCameraID,
-                                    status = status,
+                                    shift = selectedShift,
+                                    entryDateTime,
+                                    exitDateTime,
+                                    recordCount,
+                                    lastCameraID,
+                                    status,
                                 }
                             );
                         }
                     }
                 }
-            }
 
-            return Ok(result);
+                return Ok(
+                    new
+                    {
+                        workDate = selectedDate.ToString("yyyy-MM-dd"), // ✅ ชื่อตรงกับ Frontend
+                        selectedDate = selectedDate.ToString("yyyy-MM-dd"), // ✅ คงไว้กัน StatusTabMFG พัง
+                        shift = selectedShift,
+                        shiftType,
+                        currentTime = DateTime.Now.ToString("HH:mm:ss"),
+                        data = result,
+                    }
+                );
+            }
         }
 
         // GET: api/Transactions/GetTransactions (รวมคนขาดงานด้วย)
@@ -286,7 +458,21 @@ namespace Api.Controllers
                     (SELECT TOP 1 t2.CameraID 
                      FROM Transactions t2 
                      WHERE t2.EmpID = e.EmpID 
-                       AND CAST(t2.Timestamp AS DATE) = @selectedDate
+                       AND (
+    (
+        e.ShiftCode = 'A'
+        AND t.Timestamp BETWEEN 
+            DATEADD(HOUR,-1, DATEADD(HOUR,7,@selectedDate))
+            AND DATEADD(HOUR,19,@selectedDate)
+    )
+    OR
+    (
+        e.ShiftCode IN ('B','C')
+        AND t.Timestamp BETWEEN 
+            DATEADD(HOUR,-1, DATEADD(HOUR,19,DATEADD(DAY,-1,@selectedDate)))
+            AND DATEADD(HOUR,7,@selectedDate)
+    )
+)
                      ORDER BY t2.Timestamp DESC) AS LastCameraID
                 FROM EmployeeInfo e
                 LEFT JOIN Transactions t ON e.EmpID = t.EmpID 

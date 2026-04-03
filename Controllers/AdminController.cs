@@ -514,6 +514,8 @@ namespace API_ProductionQuality.Controllers
         //     }
         // }
 
+        // เปลี่ยนจาก GenerateJwtToken(admin) เป็น GenerateJwtToken(admin, employee)
+        // และดึง EmployeeInfo มาด้วย
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] AdminLoginDto loginDto)
@@ -529,27 +531,32 @@ namespace API_ProductionQuality.Controllers
 
             try
             {
-                // ค้นหา admin ตาม Email
                 var admin = await _context.Admin.FirstOrDefaultAsync(a =>
                     a.Email == loginDto.Email
                 );
-
                 if (admin == null)
-                {
                     return Unauthorized("Invalid email or password.");
-                }
 
-                // ตรวจสอบว่า Password ที่กรอกมาถูกต้องหรือไม่
                 if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, admin.PasswordHash))
-                {
                     return Unauthorized("Invalid email or password.");
-                }
 
-                // สร้าง JWT Token และเพิ่ม role ใน claims
-                var token = GenerateJwtToken(admin);
+                // ✅ ดึงข้อมูล Biz / Process / Position จาก EmployeeInfo
+                var employee = await _context.EmployeeInfo.FirstOrDefaultAsync(e =>
+                    e.EmpID == admin.EmpID
+                );
 
-                // ส่ง token และ role กลับไป
-                return Ok(new { token, role = admin.Role });
+                // ✅ ส่ง employee เข้า GenerateJwtToken ด้วย
+                var token = GenerateJwtToken(admin, employee);
+
+                return Ok(
+                    new
+                    {
+                        token,
+                        role = admin.Role,
+                        biz = employee?.Biz ?? "",
+                        process = employee?.Process ?? "",
+                    }
+                );
             }
             catch (Exception ex)
             {
@@ -632,42 +639,46 @@ namespace API_ProductionQuality.Controllers
         }
 
         [HttpGet("get-user-process")]
-public async Task<IActionResult> GetUserProcess([FromQuery] string email)
-{
-    if (string.IsNullOrEmpty(email))
-    {
-        return BadRequest("Email is required");
-    }
-
-    try
-    {
-        var admin = await _context.Admin.FirstOrDefaultAsync(a => a.Email == email);
-        
-        if (admin == null)
+        public async Task<IActionResult> GetUserProcess([FromQuery] string email)
         {
-            return NotFound("User not found");
-        }
+            if (string.IsNullOrEmpty(email))
+            {
+                return BadRequest("Email is required");
+            }
 
-        // ดึงข้อมูล Process จาก EmployeeInfo
-        var employee = await _context.EmployeeInfo.FirstOrDefaultAsync(e => e.EmpID == admin.EmpID);
-        
-        return Ok(new 
-        { 
-            user_id = admin.user_id,
-            empID = admin.EmpID,
-            firstName = admin.FirstName,
-            lastName = admin.LastName,
-            role = admin.Role,
-            email = admin.Email,
-            process = employee?.Process // ส่ง process กลับไปด้วย
-        });
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error getting user process: {ex.Message}");
-        return StatusCode(500, "Internal server error");
-    }
-}
+            try
+            {
+                var admin = await _context.Admin.FirstOrDefaultAsync(a => a.Email == email);
+
+                if (admin == null)
+                {
+                    return NotFound("User not found");
+                }
+
+                // ดึงข้อมูล Process จาก EmployeeInfo
+                var employee = await _context.EmployeeInfo.FirstOrDefaultAsync(e =>
+                    e.EmpID == admin.EmpID
+                );
+
+                return Ok(
+                    new
+                    {
+                        user_id = admin.user_id,
+                        empID = admin.EmpID,
+                        firstName = admin.FirstName,
+                        lastName = admin.LastName,
+                        role = admin.Role,
+                        email = admin.Email,
+                        process = employee?.Process, // ส่ง process กลับไปด้วย
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting user process: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
+        }
 
         // ฟังก์ชันส่งอีเมลให้กับ Leader
         private void SendVerificationEmail(Admin admin, string password)
@@ -718,7 +729,9 @@ public async Task<IActionResult> GetUserProcess([FromQuery] string email)
             }
         }
 
-        private string GenerateJwtToken(Admin admin)
+        // รับ employee เพิ่ม แล้วใส่ biz / process / position ใน claims
+
+        private string GenerateJwtToken(Admin admin, EmployeeInfo? employee = null)
         {
             var key = _configuration["Jwt:Key"];
             var creds = new SigningCredentials(
@@ -726,20 +739,27 @@ public async Task<IActionResult> GetUserProcess([FromQuery] string email)
                 SecurityAlgorithms.HmacSha256
             );
 
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, admin.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim("role", admin.Role ?? ""),
+                // ✅ เพิ่ม 3 claims นี้
+                new Claim("empID", admin.EmpID.ToString()),
+                new Claim("biz", employee?.Biz ?? ""),
+                new Claim("process", employee?.Process ?? ""),
+                new Claim("position", employee?.Position ?? ""),
+            };
+
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
-                claims: new List<Claim>
-                {
-                    new Claim(JwtRegisteredClaimNames.Sub, admin.Email), // ใช้ Email เป็น Subject
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                    new Claim("role", admin.Role), // ใส่ role ใน claims
-                },
-                expires: DateTime.UtcNow.AddHours(1),
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(8), // ✅ เพิ่มเป็น 8h (เหมาะกับ shift งาน)
                 signingCredentials: creds
             );
 
-            return new JwtSecurityTokenHandler().WriteToken(token); // สร้างและแปลงเป็น JWT Token
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         // ฟังก์ชันยืนยันอีเมล

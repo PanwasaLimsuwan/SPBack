@@ -716,7 +716,7 @@ namespace API_ProductionQuality.Controllers
                     );
 
                     // ใช้ App Password
-                    client.Authenticate("panwasalimsuwan@gmail.com", "xemtsrhrnzpddwjl"); // ใช้ App Password แทนรหัสผ่านปกติ
+                    client.Authenticate("panwasalimsuwan@gmail.com", "pkwzydpqdwhqijnd"); // ใช้ App Password แทนรหัสผ่านปกติ
 
                     client.Send(message);
                     client.Disconnect(true);

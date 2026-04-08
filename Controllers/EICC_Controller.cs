@@ -138,7 +138,82 @@ namespace Api.Controllers
         }
 
         [HttpGet("MonthlySummary")]
-        public async Task<IActionResult> GetMonthlySummary(
+public async Task<IActionResult> GetMonthlySummary(
+    [FromQuery] string? division,
+    [FromQuery] string? department,
+    [FromQuery] string? section,
+    [FromQuery] string? biz,
+    [FromQuery] string? process
+)
+{
+    var results = new List<object>();
+    using var conn = new SqlConnection(_connectionString);
+    await conn.OpenAsync();
+
+    var query = @"
+    SELECT 
+        FORMAT(eicc.WeekStartDate, 'yyyy-MM') AS Month,
+        COUNT(DISTINCT CASE 
+            WHEN eicc.TotalHours > 60 
+            THEN eicc.EmpID 
+        END) AS OverloadEmployees
+    FROM EICC_Control eicc
+    JOIN EmployeeInfo ei ON eicc.EmpID = ei.EmpID
+    WHERE 1=1
+    ";
+
+    var parameters = new List<SqlParameter>();
+
+    if (!string.IsNullOrEmpty(division))
+    {
+        query += " AND ei.Division = @division";
+        parameters.Add(new SqlParameter("@division", division));
+    }
+    if (!string.IsNullOrEmpty(department))
+    {
+        query += " AND ei.Department = @department";
+        parameters.Add(new SqlParameter("@department", department));
+    }
+    if (!string.IsNullOrEmpty(section))
+    {
+        query += " AND ei.Section = @section";
+        parameters.Add(new SqlParameter("@section", section));
+    }
+    if (!string.IsNullOrEmpty(biz))
+    {
+        query += " AND ei.Biz = @biz";
+        parameters.Add(new SqlParameter("@biz", biz));
+    }
+    if (!string.IsNullOrEmpty(process))
+    {
+        query += " AND ei.Process = @process";
+        parameters.Add(new SqlParameter("@process", process));
+    }
+
+    // ✅ GROUP BY แค่เดือน (แบบ B)
+    query += @"
+    GROUP BY FORMAT(eicc.WeekStartDate, 'yyyy-MM')
+    ORDER BY Month";
+
+    using var cmd = new SqlCommand(query, conn);
+    cmd.Parameters.AddRange(parameters.ToArray());
+
+    using var reader = await cmd.ExecuteReaderAsync();
+
+    while (await reader.ReadAsync())
+    {
+        results.Add(new
+        {
+            month = reader["Month"].ToString(),
+            overloadEmployees = Convert.ToInt32(reader["OverloadEmployees"])
+        });
+    }
+
+    return Ok(results);
+}
+
+        [HttpGet("MonthlyByProcess")]
+        public async Task<IActionResult> GetMonthlyByProcess(
             [FromQuery] string? division,
             [FromQuery] string? department,
             [FromQuery] string? section,
@@ -150,20 +225,20 @@ namespace Api.Controllers
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // 🔥 คำนวณ MonthYear จาก Year/WeekID แทนที่จะใช้ column MonthYear
             var query =
                 @"
-                SELECT 
-                    CONCAT(eicc.Year, '-W', RIGHT('00' + CAST(eicc.WeekID AS VARCHAR), 2)) AS MonthYear,
-                    ISNULL(SUM(eicc.TotalOT), 0)    AS TotalOT,
-                    ISNULL(SUM(eicc.TotalHours), 0) AS TotalHours,
-                    COUNT(DISTINCT eicc.EmpID)       AS EmployeeCount
-                FROM EICC_Control eicc
-                JOIN EmployeeInfo ei ON eicc.EmpID = ei.EmpID
-                WHERE 1=1";
+        SELECT 
+            eicc.Year,
+            eicc.WeekID,
+            CONCAT(eicc.Year, '-W', RIGHT('00' + CAST(eicc.WeekID AS VARCHAR), 2)) AS MonthYear,
+            ei.Process,
+            ISNULL(SUM(eicc.TotalOT), 0)      AS TotalOT,
+            COUNT(DISTINCT eicc.EmpID)         AS EmployeeCount
+        FROM EICC_Control eicc
+        JOIN EmployeeInfo ei ON eicc.EmpID = ei.EmpID
+        WHERE 1=1";
 
             var parameters = new List<SqlParameter>();
-
             if (!string.IsNullOrEmpty(division))
             {
                 query += " AND ei.Division = @division";
@@ -192,8 +267,8 @@ namespace Api.Controllers
 
             query +=
                 @"
-                GROUP BY eicc.Year, eicc.WeekID
-                ORDER BY eicc.Year, eicc.WeekID";
+        GROUP BY eicc.Year, eicc.WeekID, ei.Process
+        ORDER BY eicc.Year, eicc.WeekID, ei.Process";
 
             using var cmd = new SqlCommand(query, conn);
             cmd.Parameters.AddRange(parameters.ToArray());
@@ -206,13 +281,12 @@ namespace Api.Controllers
                     new
                     {
                         month = reader["MonthYear"]?.ToString(),
+                        process = reader["Process"]?.ToString(),
                         totalOT = Math.Round(Convert.ToDouble(reader["TotalOT"]), 2),
-                        totalHours = Math.Round(Convert.ToDouble(reader["TotalHours"]), 2),
                         employeeCount = Convert.ToInt32(reader["EmployeeCount"]),
                     }
                 );
             }
-
             return Ok(results);
         }
 

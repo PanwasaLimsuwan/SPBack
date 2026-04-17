@@ -90,12 +90,25 @@ WHERE Require > 0;
             await conn.OpenAsync();
 
             var query = @"
-DECLARE @WorkDate DATE;
-SELECT @WorkDate = MAX(Date) FROM Attendance WHERE CheckInTime IS NOT NULL;
+DECLARE @WorkDate DATE = CASE
+    WHEN CAST(GETDATE() AS TIME) < '07:00:00'
+    THEN CAST(DATEADD(DAY, -1, GETDATE()) AS DATE)
+    ELSE CAST(GETDATE() AS DATE)
+END;
 
-WITH PlanShift AS (
+-- ✅ แก้เป็น — คำนวณเฉพาะ ShiftCode ที่ active ตอนนี้
+WITH ActiveShift AS (
+    SELECT CASE
+        WHEN CAST(GETDATE() AS TIME) >= '07:00:00' 
+             AND CAST(GETDATE() AS TIME) < '19:00:00' THEN 'DAY'
+        ELSE 'NIGHT'
+    END AS CurrentShift
+),
+PlanShift AS (
     SELECT DISTINCT CAST(Date AS DATE) AS Date, ShiftCode 
-    FROM ManpowerPlan WHERE CAST(Date AS DATE) = @WorkDate
+    FROM ManpowerPlan 
+    WHERE CAST(Date AS DATE) = @WorkDate
+      AND Shift = (SELECT CurrentShift FROM ActiveShift)  -- ✅ filter เฉพาะกะนี้
 ),
 Employees AS (
     SELECT e.EmpID, e.Biz, e.Process, e.ShiftCode FROM EmployeeInfo e
@@ -113,9 +126,9 @@ SkillBreakdown AS (
     JOIN Employees e ON LTRIM(RTRIM(e.ShiftCode)) = LTRIM(RTRIM(ps.ShiftCode))
     JOIN EmployeeSkill s ON s.EmpID = e.EmpID
     LEFT JOIN Attendance pe 
-        ON pe.EmpID = e.EmpID 
-        AND pe.Date = @WorkDate
-        AND pe.CheckInTime IS NOT NULL
+    ON pe.EmpID = e.EmpID 
+    AND pe.Date = @WorkDate
+    AND pe.Status != 'Absent'  -- มาทำงาน = ไม่ขาด
     GROUP BY e.Biz, e.Process, s.SkillGroup
 )
 MERGE ManpowerReq AS target

@@ -12,7 +12,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowLocalhost",
         policy =>
         {
-            policy.WithOrigins("http://localhost:8080") // แหล่งที่มาที่จะอนุญาต
+            // policy.WithOrigins("http://localhost:8080") // แหล่งที่มาที่จะอนุญาต
+            policy.SetIsOriginAllowed(_ => true) 
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
@@ -49,6 +50,9 @@ builder.Services.AddScoped<AttendanceService>();
 builder.Services.AddScoped<ManpowerPlanService>();
 builder.Services.AddScoped<ManpowerReqService>();
 // builder.Services.AddScoped<DailySimulationService>();
+
+builder.Services.AddSingleton<TransactionSimulatorService>();
+builder.Services.AddHostedService(p => p.GetRequiredService<TransactionSimulatorService>());
 
 builder.Services.AddHostedService<AttendanceJob>();
 builder.Services.AddHostedService<WorktimeJob>();
@@ -123,11 +127,6 @@ var app = builder.Build();
 //     await manpower.RecalculateAllAsync();
 // }
 
-// ใช้ CORS ที่กำหนด
-app.UseCors("AllowLocalhost");
-app.MapHub<AttendanceHub>("/attendanceHub");
-app.MapHub<NotificationHub>("/notificationHub");
-
 // Enable Swagger middleware if in Development
 if (app.Environment.IsDevelopment())
 {
@@ -135,6 +134,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(); // Add this line to enable Swagger UI
 }
 
+// ลบบรรทัดซ้ำออก และเรียงใหม่เป็น:
+app.UseDefaultFiles();      // ← ต้องมาก่อน
+app.UseStaticFiles();       // ← ต้องมาก่อน
+app.UseCors("AllowLocalhost");
 app.UseHttpsRedirection();
+app.MapHub<AttendanceHub>("/attendanceHub");
+app.MapHub<NotificationHub>("/notificationHub");
 app.MapControllers();
+app.MapFallbackToFile("index.html");  // ← ต้องมาหลังสุด
 app.Run();

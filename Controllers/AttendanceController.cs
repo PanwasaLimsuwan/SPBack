@@ -1419,16 +1419,19 @@ namespace Api.Controllers
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
+            // ✅ WHERE อยู่ก่อน GROUP BY เสมอ, ใส่ filter ต่อท้ายได้เลย
             var query =
                 @"
         SELECT
             e.Process,
             COUNT(*) AS AbsentCount,
-            DATEPART(WEEK, a.Date) AS WeekNumber,
-            YEAR(a.Date) AS Year
+            DATEPART(ISO_WEEK, a.Date) AS WeekNumber,
+            YEAR(a.Date) AS Year,
+            MIN(CAST(a.Date AS DATE)) AS StartDate,
+            MAX(CAST(a.Date AS DATE)) AS EndDate
         FROM Attendance a
         JOIN EmployeeInfo e ON a.EmpID = e.EmpID
-        WHERE a.Status IN ('Absent', 'Late', 'absent', 'late')
+        WHERE LOWER(a.Status) = 'absent'
     ";
 
             var cmd = new SqlCommand();
@@ -1441,37 +1444,40 @@ namespace Api.Controllers
             }
             if (week.HasValue)
             {
-                query += " AND DATEPART(WEEK, a.Date) = @week";
+                query += " AND DATEPART(ISO_WEEK, a.Date) = @week";
                 cmd.Parameters.AddWithValue("@week", week.Value);
             }
             if (!string.IsNullOrEmpty(division))
             {
-                query += " AND e.Division=@division";
+                query += " AND e.Division = @division";
                 cmd.Parameters.AddWithValue("@division", division);
             }
             if (!string.IsNullOrEmpty(department))
             {
-                query += " AND e.Department=@department";
+                query += " AND e.Department = @department";
                 cmd.Parameters.AddWithValue("@department", department);
             }
             if (!string.IsNullOrEmpty(section))
             {
-                query += " AND e.Section=@section";
+                query += " AND e.Section = @section";
                 cmd.Parameters.AddWithValue("@section", section);
             }
             if (!string.IsNullOrEmpty(biz))
             {
-                query += " AND e.Biz=@biz";
+                query += " AND e.Biz = @biz";
                 cmd.Parameters.AddWithValue("@biz", biz);
             }
             if (!string.IsNullOrEmpty(process))
             {
-                query += " AND e.Process=@process";
+                query += " AND e.Process = @process";
                 cmd.Parameters.AddWithValue("@process", process);
             }
 
-            query += " GROUP BY e.Process, DATEPART(WEEK, a.Date), YEAR(a.Date)";
-            query += " ORDER BY WeekNumber";
+            // ✅ GROUP BY และ ORDER BY ต่อท้ายสุด
+            query +=
+                @"
+        GROUP BY e.Process, DATEPART(ISO_WEEK, a.Date), YEAR(a.Date)
+        ORDER BY WeekNumber";
 
             cmd.CommandText = query;
             cmd.CommandTimeout = 300;
@@ -1480,6 +1486,13 @@ namespace Api.Controllers
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
+                var anyDate = reader.GetDateTime(4); // ใช้ MIN(Date) เป็นตัวอ้างอิง
+
+                // 👉 ทำให้เป็น Monday (ISO week)
+                int diff = (7 + (anyDate.DayOfWeek - DayOfWeek.Monday)) % 7;
+                var startOfWeek = anyDate.AddDays(-diff).Date;
+                var endOfWeek = startOfWeek.AddDays(6);
+
                 result.Add(
                     new
                     {
@@ -1487,6 +1500,8 @@ namespace Api.Controllers
                         absentCount = reader.GetInt32(1),
                         weekNumber = reader.GetInt32(2),
                         year = reader.GetInt32(3),
+                        startDate = startOfWeek.ToString("yyyy-MM-dd"),
+                        endDate = endOfWeek.ToString("yyyy-MM-dd"),
                     }
                 );
             }
@@ -1494,18 +1509,21 @@ namespace Api.Controllers
             return Ok(result);
         }
 
-        // endpoint แยกดึง week options
         [HttpGet("WeekOptions")]
         public async Task<IActionResult> GetWeekOptions([FromQuery] int? year)
         {
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
+            // ✅ WHERE ก่อน GROUP BY เสมอ
             var query =
                 @"
-        SELECT DISTINCT DATEPART(WEEK, Date) AS WeekNumber
+        SELECT DISTINCT
+            DATEPART(ISO_WEEK, Date) AS WeekNumber,
+            MIN(CAST(Date AS DATE))  AS StartDate,
+            MAX(CAST(Date AS DATE))  AS EndDate
         FROM Attendance
-        WHERE Status IN ('Absent', 'Late', 'absent', 'late')
+        WHERE LOWER(Status) = 'absent'
     ";
 
             var cmd = new SqlCommand();
@@ -1517,13 +1535,30 @@ namespace Api.Controllers
                 cmd.Parameters.AddWithValue("@year", year.Value);
             }
 
-            query += " ORDER BY WeekNumber";
+            query += " GROUP BY DATEPART(ISO_WEEK, Date) ORDER BY WeekNumber";
             cmd.CommandText = query;
+            cmd.CommandTimeout = 300;
 
-            var result = new List<int>();
+            var result = new List<object>();
+
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
-                result.Add(reader.GetInt32(0));
+            {
+                var anyDate = reader.GetDateTime(1);
+
+                int diff = (7 + (anyDate.DayOfWeek - DayOfWeek.Monday)) % 7;
+                var startOfWeek = anyDate.AddDays(-diff).Date;
+                var endOfWeek = startOfWeek.AddDays(6);
+
+                result.Add(
+                    new
+                    {
+                        weekID = reader.GetInt32(0),
+                        startDate = startOfWeek.ToString("yyyy-MM-dd"),
+                        endDate = endOfWeek.ToString("yyyy-MM-dd"),
+                    }
+                );
+            }
 
             return Ok(result);
         }
@@ -1543,52 +1578,50 @@ namespace Api.Controllers
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // ✅ Step 1: Auto-detect กะ — เหมือน GetFaceEntry
+            // ✅ STEP 1: ใช้เวลา real-time (แทน Transactions)
+            DateTime now = DateTime.Now;
+
             DateTime selectedDate;
-            string selectedShift;
             string shiftType;
 
+            if (now.Hour >= 7 && now.Hour < 19)
+            {
+                selectedDate = now.Date;
+                shiftType = "DAY";
+            }
+            else if (now.Hour >= 19)
+            {
+                selectedDate = now.Date;
+                shiftType = "NIGHT";
+            }
+            else
+            {
+                selectedDate = now.Date.AddDays(-1);
+                shiftType = "NIGHT";
+            }
+
+            // ✅ STEP 2: หา ShiftCode จาก ManpowerPlan
+            string selectedShift;
             using (
                 var cmdShift = new SqlCommand(
                     @"
-    SELECT TOP 1 t.Timestamp, e.ShiftCode
-    FROM Transactions t
-    JOIN EmployeeInfo e ON t.EmpID = e.EmpID
-    ORDER BY t.Timestamp DESC
-",
+        SELECT TOP 1 ShiftCode
+        FROM ManpowerPlan
+        WHERE CAST(Date AS DATE) = @date
+          AND Shift = @shift
+    ",
                     conn
                 )
             )
             {
-                using var r = await cmdShift.ExecuteReaderAsync();
+                cmdShift.Parameters.AddWithValue("@date", selectedDate);
+                cmdShift.Parameters.AddWithValue("@shift", shiftType);
 
-                if (!await r.ReadAsync())
-                {
-                    selectedDate = DateTime.Now.Date;
-                    selectedShift = "A";
-                    shiftType = "DAY";
-                }
-                else
-                {
-                    var ts = Convert.ToDateTime(r["Timestamp"]);
-                    var shiftCode = r["ShiftCode"]?.ToString() ?? "A";
-
-                    if (shiftCode == "A")
-                    {
-                        selectedDate = ts.Date;
-                        shiftType = "DAY";
-                        selectedShift = "A";
-                    }
-                    else
-                    {
-                        selectedDate = ts.Hour < 19 ? ts.Date.AddDays(-1) : ts.Date;
-                        shiftType = "NIGHT";
-                        selectedShift = shiftCode;
-                    }
-                }
+                var r = await cmdShift.ExecuteScalarAsync();
+                selectedShift = r?.ToString() ?? "A";
             }
 
-            // ✅ Step 2: คำนวณ time window — hardcode ไม่ใช้ ShiftMaster
+            // ✅ STEP 3: Time window (ยังใช้ได้)
             DateTime startTime,
                 endTime;
             if (shiftType == "DAY")

@@ -172,84 +172,89 @@ namespace Api.Controllers
                 //             }
 
                 // ✅ Step 1: หา Timestamp ล่าสุดจาก Transactions
+                DateTime now = DateTime.Now;
+
                 DateTime selectedDate;
                 string shiftType;
                 string selectedShift;
 
+                // ✅ STEP 1: หา shiftType + workDate
+                // if (now.Hour >= 7 && now.Hour < 19)
+                // {
+                //     selectedDate = now.Date;
+                //     shiftType = "DAY";
+                // }
+                // else if (now.Hour >= 19)
+                // {
+                //     selectedDate = now.Date;
+                //     shiftType = "NIGHT";
+                // }
+                // else
+                // {
+                //     selectedDate = now.Date.AddDays(-1);
+                //     shiftType = "NIGHT";
+                // }
+
+                // ✅ ใหม่ — delay 15 นาที ก่อนเปลี่ยน shift
+                // DAY  = 07:15 - 19:14
+                // NIGHT = 19:15 - 07:14 ของวันถัดไป
+
+                TimeSpan nowTime = now.TimeOfDay;
+                TimeSpan dayStart = new TimeSpan(7, 15, 0); // 07:15
+                TimeSpan nightStart = new TimeSpan(19, 15, 0); // 19:15
+
+                if (nowTime >= dayStart && nowTime < nightStart)
+                {
+                    selectedDate = now.Date;
+                    shiftType = "DAY";
+                }
+                else if (nowTime >= nightStart)
+                {
+                    selectedDate = now.Date;
+                    shiftType = "NIGHT";
+                }
+                else // 00:00 - 07:14 → กะดึกที่เริ่มเมื่อวาน
+                {
+                    selectedDate = now.Date.AddDays(-1);
+                    shiftType = "NIGHT";
+                }
+
+                // ✅ STEP 2: หา ShiftCode จาก ManpowerPlan (ทำครั้งเดียว!)
                 using (
                     var cmd = new SqlCommand(
                         @"
-    SELECT TOP 1 t.Timestamp, e.ShiftCode
-    FROM Transactions t
-    JOIN EmployeeInfo e ON t.EmpID = e.EmpID
-    ORDER BY t.Timestamp DESC
+    SELECT TOP 1 ShiftCode 
+    FROM ManpowerPlan
+    WHERE CAST(Date AS DATE) = @date
+      AND Shift = @shift
 ",
                         conn
                     )
                 )
                 {
-                    using var r = await cmd.ExecuteReaderAsync();
-                    if (!await r.ReadAsync())
-                    {
-                        // ไม่มีข้อมูลเลย fallback วันนี้
-                        selectedDate = DateTime.Now.Date;
-                        selectedShift = "A";
-                        shiftType = "DAY";
-                    }
-                    else
-                    {
-                        var ts = Convert.ToDateTime(r["Timestamp"]);
-                        var shiftCode = r["ShiftCode"]?.ToString() ?? "A";
+                    cmd.Parameters.AddWithValue("@date", selectedDate);
+                    cmd.Parameters.AddWithValue("@shift", shiftType);
 
-                        if (shiftCode == "A")
-                        {
-                            // กะกลางวัน → workDate = วันที่ Transaction นั้น
-                            selectedDate = ts.Date;
-                            shiftType = "DAY";
-                            selectedShift = "A";
-                        }
-                        else
-                        {
-                            // กะดึก B/C → ถ้า Timestamp อยู่ 00:00-18:59
-                            // แปลว่ายังอยู่ในกะดึกของวันก่อนหน้า
-                            selectedDate = ts.Hour < 19 ? ts.Date.AddDays(-1) : ts.Date;
-                            shiftType = "NIGHT";
-                            selectedShift = shiftCode;
-                        }
-                    }
+                    var r = await cmd.ExecuteScalarAsync();
+                    selectedShift = r?.ToString() ?? "A";
                 }
 
-                // ✅ ถ้า Frontend ส่ง shiftOverride มา ให้ override
+                // ✅ STEP 3: override (ถ้ามี)
                 if (!string.IsNullOrEmpty(shiftOverride))
                 {
                     selectedShift = shiftOverride;
-                    using (
-                        var cmd = new SqlCommand(
-                            @"
-        SELECT TOP 1 Shift 
-        FROM ManpowerPlan 
-        WHERE CAST([Date] AS DATE) = @date AND ShiftCode = @code
-    ",
-                            conn
-                        )
-                    )
-                    {
-                        cmd.Parameters.AddWithValue("@date", selectedDate);
-                        cmd.Parameters.AddWithValue("@code", selectedShift);
-                        var r = await cmd.ExecuteScalarAsync();
-                        shiftType = r?.ToString() ?? shiftType;
-                    }
                 }
 
-                // ✅ Step 2: คำนวณ time window
+                // ✅ STEP 4: คำนวณเวลา (ห้ามลืม!!)
                 DateTime startTime,
                     endTime;
+
                 if (shiftType == "DAY")
                 {
                     startTime = selectedDate.AddHours(7);
                     endTime = selectedDate.AddHours(19);
                 }
-                else // NIGHT
+                else
                 {
                     startTime = selectedDate.AddHours(19);
                     endTime = selectedDate.AddDays(1).AddHours(7);

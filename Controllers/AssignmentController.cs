@@ -4,12 +4,13 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Text;
 using System.Threading.Tasks;
+using Api.Hubs;
 using Api.Models;
-using MailKit.Net.Smtp;
-using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
-using MimeKit;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace Api.Controllers
 {
@@ -18,11 +19,21 @@ namespace Api.Controllers
     public class AssignmentController : ControllerBase
     {
         private readonly string _connectionString;
+        private readonly IConfiguration _configuration;
+        private readonly IHubContext<AttendanceHub> _hub;
 
-        public AssignmentController(IConfiguration configuration)
+        public AssignmentController(IConfiguration configuration, IHubContext<AttendanceHub> hub)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _configuration = configuration;
+            _hub = hub;
         }
+
+        private static DateTime ThaiNow =>
+    TimeZoneInfo.ConvertTimeFromUtc(
+        DateTime.UtcNow,
+        TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")
+    );
 
         // GET: api/Assignment
         [HttpGet]
@@ -114,7 +125,8 @@ WHERE 1=1"
                 if (errors.Count > 0)
                     return BadRequest(string.Join(" ", errors));
 
-                var startAt = assignment.StartAt == default ? DateTime.UtcNow : assignment.StartAt;
+                // var startAt = assignment.StartAt == default ? DateTime.UtcNow : assignment.StartAt;
+                var startAt = assignment.StartAt == default ? ThaiNow : assignment.StartAt;
                 object endAt =
                     (assignment.EndAt == default) ? DBNull.Value : (object)assignment.EndAt;
                 var status = string.IsNullOrWhiteSpace(assignment.Status)
@@ -216,7 +228,8 @@ VALUES (@EmpID,@FromBiz,@FromProcess,@ToBiz,@ToProcess,@SkillGroup,@StartAt,NULL
                 cmd.Parameters.Add("@ToProcess", SqlDbType.NVarChar, 100).Value = req.Process;
                 cmd.Parameters.Add("@SkillGroup", SqlDbType.NVarChar, 100).Value =
                     req.SkillGroup ?? "General";
-                cmd.Parameters.Add("@StartAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                // cmd.Parameters.Add("@StartAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                cmd.Parameters.Add("@StartAt", SqlDbType.DateTime2).Value = ThaiNow;
 
                 var newId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 assigned.Add(
@@ -246,7 +259,7 @@ VALUES (@EmpID,@FromBiz,@FromProcess,@ToBiz,@ToProcess,@SkillGroup,@StartAt,NULL
                             fromSupervisorEmail = "panwasalimsuwan@gmail.com";
 
                         // EmailService.SendEmail(fromSupervisorEmail,
-                        EmailService.SendEmail(
+                        new EmailService(_configuration).SendEmail(
                             "panwasalimsuwan@gmail.com",
                             $"[รออนุมัติ] Auto-Assign พนักงาน {empCopy.EmpID} → {reqCopy.Process}",
                             $"ระบบได้ Auto-Assign พนักงาน {empCopy.EmpID} {empCopy.FirstName} {empCopy.LastName}\n"
@@ -368,11 +381,13 @@ AND (
                 cmd.Parameters.Add("@status", SqlDbType.NVarChar, 50).Value = status;
                 cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
                 if (status == "Completed" || status == "Cancelled")
-                    cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                    // cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                    cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = ThaiNow;
 
                 var rows = await cmd.ExecuteNonQueryAsync();
                 if (rows == 0)
                     return NotFound("Assignment not found.");
+                await _hub.Clients.All.SendAsync("AssignmentUpdated"); // ✅ เพิ่มตรงนี้
                 return Ok("Status updated successfully.");
             }
             catch (Exception ex)
@@ -394,7 +409,8 @@ AND (
             [FromBody] UpdateEndAtDto model
         )
         {
-            var endAt = model?.EndAt ?? DateTime.UtcNow;
+            // var endAt = model?.EndAt ?? DateTime.UtcNow;
+            var endAt = model?.EndAt ?? ThaiNow;
             var status = string.IsNullOrWhiteSpace(model?.Status) ? "Completed" : model.Status;
 
             using var conn = new SqlConnection(_connectionString);
@@ -489,6 +505,8 @@ AND (
             if (rows == 0)
                 return NotFound("Assignment not found or already approved.");
 
+            await _hub.Clients.All.SendAsync("AssignmentUpdated"); // ✅ เพิ่มตรงนี้
+
             // ✅ ส่ง email หลัง approve
             _ = Task.Run(async () =>
             {
@@ -499,7 +517,7 @@ AND (
                     if (!string.IsNullOrEmpty(empEmail))
                     {
                         // EmailService.SendEmail(empEmail,
-                        EmailService.SendEmail(
+                        new EmailService(_configuration).SendEmail(
                             "panwasalimsuwan@gmail.com",
                             $"[อนุมัติแล้ว] คุณได้รับมอบหมายงานที่ {assignment.ToProcess}",
                             $"Assignment ของคุณได้รับการอนุมัติแล้ว\n"
@@ -516,7 +534,7 @@ AND (
                     if (!string.IsNullOrEmpty(toLeaderEmail))
                     {
                         // EmailService.SendEmail(toLeaderEmail,
-                        EmailService.SendEmail(
+                        new EmailService(_configuration).SendEmail(
                             "panwasalimsuwan@gmail.com",
                             $"[แจ้งเตือน] พนักงาน {assignment.EmpID} จะมาช่วยงาน {assignment.ToProcess}",
                             $"Assignment ได้รับการอนุมัติแล้ว\n"
@@ -556,13 +574,24 @@ AND (
                     + $"กรุณาเข้า Dashboard เพื่ออนุมัติ";
 
                 // EmailService.SendEmail(fromLeaderEmail, subject, body);
-                EmailService.SendEmail("panwasalimsuwan@gmail.com", subject, body);
+                new EmailService(_configuration).SendEmail(
+                    "panwasalimsuwan@gmail.com",
+                    subject,
+                    body
+                );
                 return Ok("Email sent to supervisor.");
             }
+            // catch (Exception ex)
+            // {
+            //     return Problem(title: "Email sending failed", detail: ex.Message, statusCode: 500);
+            // }
             catch (Exception ex)
             {
-                return Problem(title: "Email sending failed", detail: ex.Message, statusCode: 500);
+                Console.WriteLine("❌ Email error: " + ex.Message);
+                // ❗ ไม่ต้อง return 500
             }
+
+            return Ok("Email attempted");
         }
 
         // GET: api/Assignment/with-employees
@@ -753,28 +782,42 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
 
         public class EmailService
         {
-            public static void SendEmail(string toEmail, string subject, string body)
+            private readonly IConfiguration _configuration;
+
+            public EmailService(IConfiguration configuration)
+            {
+                _configuration = configuration;
+            }
+
+            public void SendEmail(string toEmail, string subject, string body)
             {
                 try
                 {
-                    var message = new MimeMessage();
-                    message.From.Add(
-                        new MailboxAddress("MFG Dashboard", "panwasalimsuwan@gmail.com")
-                    );
-                    message.To.Add(new MailboxAddress("", toEmail));
-                    message.Subject = subject;
-                    message.Body = new BodyBuilder { TextBody = body }.ToMessageBody();
+                    var ApiKey =
+                        _configuration["SendGrid:ApiKey"]
+                        ?? throw new InvalidOperationException("SendGrid:ApiKey is not configured");
 
-                    using var client = new SmtpClient();
-                    client.Connect("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
-                    client.Authenticate("panwasalimsuwan@gmail.com", "xemtsrhrnzpddwjl");
-                    client.Send(message);
-                    client.Disconnect(true);
+                    var client = new SendGridClient(ApiKey);
+
+                    var msg = MailHelper.CreateSingleEmail(
+                        // from:             new EmailAddress("panwasalimsuwan@gmail.com", "MFG Dashboard"),
+                        from: new EmailAddress(
+                            "s6404062630465@email.kmutnb.ac.th",
+                            "MFG Dashboard"
+                        ),
+                        to: new EmailAddress(toEmail),
+                        subject: subject,
+                        plainTextContent: body,
+                        htmlContent: null
+                    );
+
+                    var response = client.SendEmailAsync(msg).GetAwaiter().GetResult();
+                    Console.WriteLine($"SendGrid status: {response.StatusCode}");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine("Email error: " + ex.Message);
-                    throw;
+                    // ไม่ throw เพราะ caller ส่วนใหญ่อยู่ใน Task.Run
                 }
             }
         }
@@ -803,9 +846,11 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
                 var sql =
                     "UPDATE Assignment SET Status='Completed', EndAt=@endAt WHERE AssignmentID=@id";
                 using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                // cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+                cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = ThaiNow;
                 cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
                 await cmd.ExecuteNonQueryAsync();
+                await _hub.Clients.All.SendAsync("AssignmentUpdated"); // ✅ เพิ่มตรงนี้
 
                 // แจ้ง FromProcess ว่าพนักงานกลับมาแล้ว
                 _ = Task.Run(async () =>
@@ -817,7 +862,7 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
                             assignment.FromProcess
                         );
                         if (!string.IsNullOrEmpty(fromEmail))
-                            EmailService.SendEmail(
+                            new EmailService(_configuration).SendEmail(
                                 "panwasalimsuwan@gmail.com",
                                 $"[พนักงานกลับมาแล้ว] {assignment.EmpID} คืนจาก {assignment.ToProcess}",
                                 $"พนักงาน {assignment.EmpID} ได้กลับมายัง {assignment.FromProcess} / {assignment.FromBiz} แล้ว\n"
@@ -839,6 +884,7 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
                 await cmd.ExecuteNonQueryAsync();
+                await _hub.Clients.All.SendAsync("AssignmentUpdated"); // ✅ เพิ่มตรงนี้
 
                 // แจ้ง ToProcess ว่าถูกขอพนักงานคืน รอยืนยัน
                 _ = Task.Run(async () =>
@@ -850,7 +896,7 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
                             assignment.ToProcess
                         );
                         if (!string.IsNullOrEmpty(toEmail))
-                            EmailService.SendEmail(
+                            new EmailService(_configuration).SendEmail(
                                 "panwasalimsuwan@gmail.com",
                                 $"[ขอคืนพนักงาน] {assignment.EmpID} จาก {assignment.FromProcess}",
                                 $"หัวหน้า {assignment.FromProcess} ขอคืนพนักงาน {assignment.EmpID}\n"
@@ -890,9 +936,11 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
             var sql =
                 "UPDATE Assignment SET Status='Completed', EndAt=@endAt WHERE AssignmentID=@id";
             using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+            // cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = DateTime.UtcNow;
+            cmd.Parameters.Add("@endAt", SqlDbType.DateTime2).Value = ThaiNow;
             cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
             await cmd.ExecuteNonQueryAsync();
+            await _hub.Clients.All.SendAsync("AssignmentUpdated"); // ✅ เพิ่มตรงนี้
 
             // แจ้ง FromProcess ว่า ToProcess ยืนยันแล้ว
             _ = Task.Run(async () =>
@@ -904,7 +952,7 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
                         assignment.FromProcess
                     );
                     if (!string.IsNullOrEmpty(fromEmail))
-                        EmailService.SendEmail(
+                        new EmailService(_configuration).SendEmail(
                             "panwasalimsuwan@gmail.com",
                             $"[ยืนยันแล้ว] พนักงาน {assignment.EmpID} กลับมายัง {assignment.FromProcess}",
                             $"{assignment.ToProcess} ยืนยันการคืนพนักงาน {assignment.EmpID} แล้ว\n"

@@ -108,10 +108,16 @@ namespace Api.Services
             // ✅ เช็คก่อนว่ามี transaction ใหม่ไหม
             var checkCmd = new SqlCommand(
                 @"
-        SELECT COUNT(1) FROM Transactions
-        WHERE Timestamp >= DATEADD(MINUTE, -2, GETDATE())
-          AND EmpID IS NOT NULL
-          AND CameraID IN (2, 3)
+        DECLARE @WorkDate DATE = CASE
+    WHEN CAST(GETDATE() AS TIME) < '07:00:00'
+    THEN CAST(DATEADD(DAY, -1, GETDATE()) AS DATE)
+    ELSE CAST(GETDATE() AS DATE)
+END;
+
+SELECT COUNT(1) FROM Transactions
+WHERE CAST(Timestamp AS DATE) = @WorkDate
+  AND EmpID IS NOT NULL
+  AND CameraID IN (2, 3)
     ",
                 conn
             );
@@ -125,7 +131,12 @@ namespace Api.Services
             {
                 var cmd = new SqlCommand(
                     @"
-DECLARE @From DATETIME = DATEADD(MINUTE, -2, GETDATE());
+DECLARE @WorkDate DATE = CASE
+    WHEN CAST(GETDATE() AS TIME) < '07:00:00'
+    THEN CAST(DATEADD(DAY, -1, GETDATE()) AS DATE)
+    ELSE CAST(GETDATE() AS DATE)
+END;
+DECLARE @From DATETIME = CAST(@WorkDate AS DATETIME);
 
 WITH AffectedEmps AS (
     SELECT DISTINCT EmpID

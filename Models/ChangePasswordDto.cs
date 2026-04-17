@@ -1,0 +1,7 @@
+namespace Api.Models
+{
+    public class ChangePasswordDto
+    {
+        public string NewPassword { get; set; }
+    }
+}

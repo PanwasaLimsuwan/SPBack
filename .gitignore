@@ -1,0 +1,20 @@
+# build
+bin/
+obj/
+
+# publish
+publish/
+
+# config (secret)
+appsettings.Development.json
+appsettings.*.local.json
+
+# env
+.env
+
+# DB
+full_script-1.sql
+full_script.sql
+manpowerDb4.sql
+migration.sql
+scriptEC2.sql

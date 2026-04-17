@@ -90,8 +90,11 @@ OPTION (MAXRECURSION 1000);
 
             var query =
                 @"
-DECLARE @WorkDate DATE;
-SELECT @WorkDate = MAX(Date) FROM Attendance WHERE CheckInTime IS NOT NULL;
+DECLARE @WorkDate DATE = CASE
+    WHEN CAST(GETDATE() AS TIME) < '07:00:00'
+    THEN CAST(DATEADD(DAY, -1, GETDATE()) AS DATE)
+    ELSE CAST(GETDATE() AS DATE)
+END;
 
 -- 🔥 อัพเดตเฉพาะวันล่าสุดแทนทุกวัน
 UPDATE ManpowerPlan

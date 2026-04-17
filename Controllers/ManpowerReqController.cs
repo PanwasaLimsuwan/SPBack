@@ -19,7 +19,6 @@ namespace Api.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // GET: api/ManpowerReq
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? division,
@@ -91,7 +90,6 @@ namespace Api.Controllers
             return Ok(result);
         }
 
-        // GET: api/ManpowerReq/latest
         [HttpGet("latest")]
         public async Task<IActionResult> GetLatest(
             [FromQuery] string? division,
@@ -99,8 +97,8 @@ namespace Api.Controllers
             [FromQuery] string? section,
             [FromQuery] string? biz,
             [FromQuery] string? process,
-            [FromQuery] DateTime? workDate,   // ✅ เพิ่ม
-    [FromQuery] string? shiftCode     // ✅ เพิ่ม
+            [FromQuery] DateTime? workDate,
+            [FromQuery] string? shiftCode
         )
         {
             var result = new List<object>();
@@ -108,26 +106,36 @@ namespace Api.Controllers
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // ✅ FIX: ใช้ JOIN แทน correlated subquery — เร็วกว่ามาก
-            // ✅ FIX: status ในระบบจริงคือ Normal/Late/Absent ไม่ใช่ Present
-            //         นับ "ขาด" = Absent เท่านั้น
             var query = @"
-                -- pre-aggregate absent count ก่อน แล้วค่อย join
-                WITH LatestDate AS (
-                    SELECT MAX(Date) AS MaxDate FROM ManpowerReq
-                ),
-                AbsentCount AS (
-                    SELECT
-                        ei.Biz,
-                        ei.Process,
-                        COUNT(*) AS AbsentTotal
-                    FROM Attendance a
-                    JOIN EmployeeInfo ei ON a.EmpID = ei.EmpID
-                    WHERE CAST(a.Date AS DATE) = (SELECT CAST(MaxDate AS DATE) FROM LatestDate)
-                    AND a.Status = 'Absent'
-                    GROUP BY ei.Biz, ei.Process
-                ),
-                AssignedCount AS (
+WITH LatestDate AS (
+    SELECT CAST(
+        CASE 
+            WHEN CAST(GETDATE() AS TIME) < '07:00:00'
+            THEN DATEADD(DAY, -1, GETDATE())
+            ELSE GETDATE()
+        END 
+    AS DATE) AS MaxDate
+),
+ActiveShift AS (
+    SELECT CASE
+        WHEN CAST(GETDATE() AS TIME) >= '07:00:00' 
+             AND CAST(GETDATE() AS TIME) < '19:00:00' THEN 'DAY'
+        ELSE 'NIGHT'
+    END AS CurrentShift
+),
+AbsentCount AS (
+    SELECT ei.Biz, ei.Process, COUNT(*) AS AbsentTotal
+    FROM Attendance a
+    JOIN EmployeeInfo ei ON a.EmpID = ei.EmpID
+    JOIN ManpowerPlan mp 
+        ON LTRIM(RTRIM(mp.ShiftCode)) = LTRIM(RTRIM(ei.ShiftCode))
+        AND CAST(mp.Date AS DATE) = (SELECT MaxDate FROM LatestDate)
+        AND mp.Shift = (SELECT CurrentShift FROM ActiveShift)
+    WHERE CAST(a.Date AS DATE) = (SELECT MaxDate FROM LatestDate)
+    AND a.Status = 'Absent'
+    GROUP BY ei.Biz, ei.Process
+),
+AssignedCount AS (
     SELECT
         ToProcess AS Process,
         ToBiz     AS Biz,
@@ -136,33 +144,33 @@ namespace Api.Controllers
     WHERE Status IN ('Active', 'Returning')
     GROUP BY ToProcess, ToBiz
 )
-                SELECT DISTINCT
-                    m.Date        AS WorkDate,
-                    m.Biz,
-                    m.Process,
-                    m.SkillGroup,
-                    m.Require     AS Required,
-                    m.Present,
-                    m.Shortage,
-                    m.LastUpdateTime,
-                    e.Division,
-                    e.Department,
-                    e.Section,
-                    CASE
-    WHEN ISNULL(ac.AbsentTotal, 0) - ISNULL(asgn.AssignedTotal, 0) < 0 THEN 0
-    ELSE ISNULL(ac.AbsentTotal, 0) - ISNULL(asgn.AssignedTotal, 0)
-END AS HeadcountShortage
-                FROM ManpowerReq m
-                JOIN LatestDate ld ON m.Date = ld.MaxDate
-                LEFT JOIN (
-                    SELECT DISTINCT Biz, Process, Division, Department, Section
-                    FROM EmployeeInfo
-                ) e ON m.Biz = e.Biz AND m.Process = e.Process
-                LEFT JOIN AbsentCount ac
-                    ON m.Biz = ac.Biz AND m.Process = ac.Process
-                LEFT JOIN AssignedCount asgn
+SELECT DISTINCT
+    m.Date        AS WorkDate,
+    m.Biz,
+    m.Process,
+    m.SkillGroup,
+    m.Require     AS Required,
+    m.Present,
+    m.Shortage,
+    m.LastUpdateTime,
+    e.Division,
+    e.Department,
+    e.Section,
+    CASE
+        WHEN ISNULL(ac.AbsentTotal, 0) - ISNULL(asgn.AssignedTotal, 0) < 0 THEN 0
+        ELSE ISNULL(ac.AbsentTotal, 0) - ISNULL(asgn.AssignedTotal, 0)
+    END AS HeadcountShortage
+FROM ManpowerReq m
+JOIN LatestDate ld ON m.Date = ld.MaxDate
+LEFT JOIN (
+    SELECT DISTINCT Biz, Process, Division, Department, Section
+    FROM EmployeeInfo
+) e ON m.Biz = e.Biz AND m.Process = e.Process
+LEFT JOIN AbsentCount ac
+    ON m.Biz = ac.Biz AND m.Process = ac.Process
+LEFT JOIN AssignedCount asgn
     ON m.Biz = asgn.Biz AND m.Process = asgn.Process
-                WHERE 1=1";
+WHERE 1=1";
 
             var parameters = new List<SqlParameter>();
 
@@ -206,27 +214,19 @@ END AS HeadcountShortage
                 {
                     workDate = reader["WorkDate"] == DBNull.Value
                         ? null : (DateTime?)reader["WorkDate"],
-
                     biz           = reader["Biz"]?.ToString(),
                     process       = reader["Process"]?.ToString(),
                     skillGroup    = reader["SkillGroup"]?.ToString(),
-
                     required = reader["Required"] == DBNull.Value
                         ? 0 : Convert.ToInt32(reader["Required"]),
-
                     present = reader["Present"] == DBNull.Value
                         ? 0 : Convert.ToInt32(reader["Present"]),
-
                     shortage = reader["Shortage"] == DBNull.Value
                         ? 0 : Convert.ToInt32(reader["Shortage"]),
-
-                    // ✅ นับจาก Attendance จริง (Absent = ขาด)
                     headcountShortage = reader["HeadcountShortage"] == DBNull.Value
                         ? 0 : Convert.ToInt32(reader["HeadcountShortage"]),
-
                     lastUpdateTime = reader["LastUpdateTime"] == DBNull.Value
                         ? null : (DateTime?)reader["LastUpdateTime"],
-
                     division   = reader["Division"]?.ToString(),
                     department = reader["Department"]?.ToString(),
                     section    = reader["Section"]?.ToString(),

@@ -24,7 +24,8 @@ namespace Api.Controllers
             [FromQuery] string? section,
             [FromQuery] string? biz,
             [FromQuery] string? process,
-            [FromQuery] int? weekID
+            [FromQuery] int? weekID,
+            [FromQuery] int? year
         )
         {
             var results = new List<object>();
@@ -89,6 +90,11 @@ namespace Api.Controllers
                 query += " AND eicc.WeekID = @weekID";
                 parameters.Add(new SqlParameter("@weekID", weekID.Value));
             }
+            if (year.HasValue)
+{
+    query += " AND eicc.Year = @year";
+    parameters.Add(new SqlParameter("@year", year.Value));
+}
 
             query += " ORDER BY eicc.Year, eicc.WeekID, ei.Biz, ei.Process";
 

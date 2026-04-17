@@ -7,12 +7,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Api.Models;
 using BCrypt.Net;
-using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using MimeKit;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace API_ProductionQuality.Controllers
 {
@@ -327,7 +327,7 @@ namespace API_ProductionQuality.Controllers
 
                 SendVerificationEmail(newAdmin, admin.PasswordHash);
 
-                return Ok(new { Message = $"Admin registered successfully as {admin.Role}." });
+                return Ok(new { Message = $"ลงทะเบียนพนักงานสำเร็จ {admin.Role}." });
             }
             catch (DbUpdateException dbEx)
             {
@@ -383,7 +383,8 @@ namespace API_ProductionQuality.Controllers
                 // ส่งอีเมลแจ้งเตือนหลังจากการลงทะเบียน
                 SendVerificationEmail(newAdmin, admin.PasswordHash);
 
-                return Ok(new { Message = "Admin registered successfully." });
+                // return Ok(new { Message = "Admin registered successfully." });
+                return Ok("ลงทะเบียนพนักงานสำเร็จ");
             }
             catch (DbUpdateException dbEx)
             {
@@ -610,7 +611,7 @@ namespace API_ProductionQuality.Controllers
                 }
 
                 await _context.SaveChangesAsync();
-                return Ok(new { Message = "Employee updated successfully." });
+                return Ok(new { Message = "แก้ข้อมูลพนักงานสำเร็จ" });
             }
             catch (Exception ex)
             {
@@ -635,7 +636,7 @@ namespace API_ProductionQuality.Controllers
 
             _context.Admin.Remove(admin);
             await _context.SaveChangesAsync();
-            return Ok(new { Message = "Employee deleted successfully." });
+            return Ok(new { Message = "ลบข้อมูลพนักงานสำเร็จ" });
         }
 
         [HttpGet("get-user-process")]
@@ -681,51 +682,90 @@ namespace API_ProductionQuality.Controllers
         }
 
         // ฟังก์ชันส่งอีเมลให้กับ Leader
-        private void SendVerificationEmail(Admin admin, string password)
+        //         private void SendVerificationEmail(Admin admin, string password)
+        //         {
+        //             try
+        //             {
+        //                 // สร้าง MimeMessage สำหรับส่งอีเมล
+        //                 var message = new MimeMessage();
+        //                 message.From.Add(new MailboxAddress("Your Company", "your-email@example.com"));
+        //                 // message.From.Add(new MailboxAddress("Your Company", "panwasalimsuwan@gmail.com"));
+        //                 // เปลี่ยนผู้รับเป็น panwasalimsuwan@gmail.com
+        //                 message.To.Add(new MailboxAddress("Panwasa Limsuwan", "panwasalimsuwan@gmail.com"));
+        //                 // message.To.Add(new MailboxAddress(admin.FirstName + " " + admin.LastName, admin.Email));
+        //                 message.Subject = "Your Registration Details";
+
+        //                 // สร้างเนื้อหาอีเมล
+        //                 var bodyBuilder = new BodyBuilder
+        //                 {
+        //                     TextBody =
+        //                         $"Hello {admin.FirstName} {admin.LastName},\n\n"
+        //                         + $"Your account has been created successfully. Your default password is: {password}\n"
+        //                         + "Please log in and change your password as soon as possible.\n\n"
+        //                         + "Best regards,\nYour Company",
+        //                 };
+
+        //                 message.Body = bodyBuilder.ToMessageBody();
+
+        //                 // เชื่อมต่อและส่งอีเมลผ่าน SMTP
+        //                 using (var client = new SmtpClient())
+        //                 {
+        // );
+
+        // var email = _configuration["EmailSettings:Email"];
+        // var appPassword = _configuration["EmailSettings:Password"];
+
+        // client.Authenticate(email, appPassword);
+
+        //                     // ใช้ App Password
+        //                     // client.Authenticate("panwasalimsuwan@gmail.com", "fixtsupyggozrhxf"); // ใช้ App Password แทนรหัสผ่านปกติ
+
+        //                     client.Send(message);
+        //                     client.Disconnect(true);
+        //                 }
+        //             }
+        //             catch (Exception ex)
+        //             {
+        //                 Console.WriteLine("Error sending email: " + ex.Message);
+        //                 throw new Exception("Error sending email: " + ex.Message);
+        //             }
+        //         }
+
+        private void SendVerificationEmail(Admin admin, string userPassword)
         {
             try
             {
-                // สร้าง MimeMessage สำหรับส่งอีเมล
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress("Your Company", "your-email@example.com"));
-                // message.From.Add(new MailboxAddress("Your Company", "panwasalimsuwan@gmail.com"));
-                // เปลี่ยนผู้รับเป็น panwasalimsuwan@gmail.com
-                message.To.Add(new MailboxAddress("Panwa Salimsuwan", "panwasalimsuwan@gmail.com"));
-                // message.To.Add(new MailboxAddress(admin.FirstName + " " + admin.LastName, admin.Email));
-                message.Subject = "Your Registration Details";
+                var apiKey = _configuration["SendGrid:ApiKey"];
+                var from = _configuration["EmailSettings:Email"]; // หรือจะ hardcode ก็ได้
+                var client = new SendGridClient(apiKey);
 
-                // สร้างเนื้อหาอีเมล
-                var bodyBuilder = new BodyBuilder
-                {
-                    TextBody =
-                        $"Hello {admin.FirstName} {admin.LastName},\n\n"
-                        + $"Your account has been created successfully. Your default password is: {password}\n"
-                        + "Please log in and change your password as soon as possible.\n\n"
-                        + "Best regards,\nYour Company",
-                };
+                var msg = MailHelper.CreateSingleEmail(
+                    from: new EmailAddress(from, "MFG Dashboard"),
+                    to: new EmailAddress("panwasalimsuwan@gmail.com", "Panwasa"),
+                    // to: new EmailAddress(admin.Email, $"{admin.FirstName} {admin.LastName}"),
+                    subject: "Your Registration Details",
+                    // plainTextContent:
+                    //     $"Hello {admin.FirstName} {admin.LastName},\n\n" +
+                    //     $"Your account has been created successfully.\n" +
+                    //     $"Your default password is: {userPassword}\n\n" +
+                    //     "Please change your password after login.\n\n" +
+                    //     "Best regards,\nMFG Dashboard",
+                    plainTextContent: $"คุณ {admin.FirstName} {admin.LastName},\n\n"
+                        + "ระบบได้ทำการสร้างบัญชีผู้ใช้งานของคุณเรียบร้อยแล้ว\n"
+                        + $"รหัสผ่านของคุณคือ {userPassword}\n\n",
+                        // + "⚠️ กรุณาเปลี่ยนรหัสผ่านทันทีหลังจากเข้าสู่ระบบครั้งแรก\n\n"
+                        // + "ขอแสดงความนับถือ\nMFG Dashboard",
+                    htmlContent: null
+                );
 
-                message.Body = bodyBuilder.ToMessageBody();
-
-                // เชื่อมต่อและส่งอีเมลผ่าน SMTP
-                using (var client = new SmtpClient())
-                {
-                    client.Connect(
-                        "smtp.gmail.com",
-                        587,
-                        MailKit.Security.SecureSocketOptions.StartTls
-                    );
-
-                    // ใช้ App Password
-                    client.Authenticate("panwasalimsuwan@gmail.com", "pkwzydpqdwhqijnd"); // ใช้ App Password แทนรหัสผ่านปกติ
-
-                    client.Send(message);
-                    client.Disconnect(true);
-                }
+                // SendGrid client เป็น async — ใช้ .Wait() เพราะเมธอดนี้ไม่ใช่ async
+                var response = client.SendEmailAsync(msg).GetAwaiter().GetResult();
+                Console.WriteLine($"SendGrid status: {response.StatusCode}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Error sending email: " + ex.Message);
-                throw new Exception("Error sending email: " + ex.Message);
+                throw;
             }
         }
 
@@ -856,7 +896,6 @@ namespace API_ProductionQuality.Controllers
         //         IsBodyHtml = true
         //     };
 
-        //     var smtpClient = new SmtpClient("smtp.gmail.com")
         //     {
         //         Port = 587,
         //         Credentials = new System.Net.NetworkCredential("your-email@example.com", "your-email-password"),

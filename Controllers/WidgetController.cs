@@ -1,5 +1,6 @@
 using System.Linq;
 using Api.Models; // ใช้ Model ที่สร้างขึ้น
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore; // สำหรับ DbUpdateException
 
@@ -41,89 +42,147 @@ namespace Api.Controllers
             }
         }
 
+        // [HttpPost("save-widget-settings")]
+        // public IActionResult SaveWidget([FromBody] WidgetDto settingsDto)
+        // {
+        //     var userId = int.Parse(User.FindFirst("user_id").Value);
+
+        //     var existing = _context.Widget.FirstOrDefault(w => w.user_id == userId);
+
+        //     if (settingsDto == null)
+        //     {
+        //         return BadRequest("Invalid settings data");
+        //     }
+
+        //     try
+        //     {
+        //         // ตรวจสอบว่า user_id มีอยู่ในตาราง Admin หรือไม่
+        //         var admin = _context.Admin.FirstOrDefault(a => a.user_id == settingsDto.user_id);
+        //         if (admin == null)
+        //         {
+        //             return BadRequest("User ID not found in Admin table");
+        //         }
+
+        //         // ตรวจสอบว่า UserId ในฐานข้อมูลมีข้อมูล Widget หรือไม่
+        //         var existingSettings = _context.Widget.FirstOrDefault(ws =>
+        //             ws.user_id == settingsDto.user_id
+        //         );
+
+        //         if (existingSettings != null)
+        //         {
+        //             // ถ้ามีข้อมูลการตั้งค่าอยู่แล้ว ให้ทำการอัปเดต
+        //             existingSettings.settings = settingsDto.Settings;
+        //             _context.Widget.Update(existingSettings);
+        //         }
+        //         else
+        //         {
+        //             // ถ้ายังไม่มีข้อมูล ให้สร้างข้อมูลใหม่
+        //             var newSettings = new Widget
+        //             {
+        //                 user_id = settingsDto.user_id,
+        //                 settings = settingsDto.Settings,
+        //             };
+        //             _context.Widget.Add(newSettings);
+        //         }
+
+        //         // บันทึกการเปลี่ยนแปลง
+        //         _context.SaveChanges();
+        //         return Ok("Widget settings saved successfully");
+        //     }
+        //     catch (DbUpdateException ex)
+        //     {
+        //         return StatusCode(
+        //             500,
+        //             $"Database update failed: {ex.InnerException?.Message ?? ex.Message}"
+        //         );
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return StatusCode(500, $"An unexpected error occurred: {ex.Message}");
+        //     }
+        // }
+        [Authorize] // ✅ สำคัญมาก
         [HttpPost("save-widget-settings")]
         public IActionResult SaveWidget([FromBody] WidgetDto settingsDto)
         {
-            if (settingsDto == null)
+            if (settingsDto == null || string.IsNullOrEmpty(settingsDto.Settings))
             {
                 return BadRequest("Invalid settings data");
             }
 
             try
             {
-                // ตรวจสอบว่า user_id มีอยู่ในตาราง Admin หรือไม่
-                var admin = _context.Admin.FirstOrDefault(a => a.user_id == settingsDto.user_id);
-                if (admin == null)
-                {
-                    return BadRequest("User ID not found in Admin table");
-                }
+                // ✅ เอา user_id จาก token เท่านั้น
+                var userId = int.Parse(User.FindFirst("user_id").Value);
 
-                // ตรวจสอบว่า UserId ในฐานข้อมูลมีข้อมูล Widget หรือไม่
-                var existingSettings = _context.Widget.FirstOrDefault(ws =>
-                    ws.user_id == settingsDto.user_id
-                );
+                var existingSettings = _context.Widget.FirstOrDefault(ws => ws.user_id == userId);
 
                 if (existingSettings != null)
                 {
-                    // ถ้ามีข้อมูลการตั้งค่าอยู่แล้ว ให้ทำการอัปเดต
                     existingSettings.settings = settingsDto.Settings;
-                    _context.Widget.Update(existingSettings);
                 }
                 else
                 {
-                    // ถ้ายังไม่มีข้อมูล ให้สร้างข้อมูลใหม่
                     var newSettings = new Widget
                     {
-                        user_id = settingsDto.user_id,
+                        user_id = userId,
                         settings = settingsDto.Settings,
                     };
+
                     _context.Widget.Add(newSettings);
                 }
 
-                // บันทึกการเปลี่ยนแปลง
                 _context.SaveChanges();
                 return Ok("Widget settings saved successfully");
             }
-            catch (DbUpdateException ex)
-            {
-                return StatusCode(
-                    500,
-                    $"Database update failed: {ex.InnerException?.Message ?? ex.Message}"
-                );
-            }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An unexpected error occurred: {ex.Message}");
+                return StatusCode(500, ex.Message);
             }
         }
 
         // GET: api/widget/get-widget-settings/{userId}
-        [HttpGet("get-widget-settings/{user_id}")]
-        public IActionResult GetWidget(int user_id)
+        // [HttpGet("get-widget-settings/{user_id}")]
+        // public IActionResult GetWidget(int user_id)
+        // {
+        //     var settings = _context.Widget.FirstOrDefault(ws => ws.user_id == user_id);
+
+        //     if (settings == null)
+        //     {
+        //         return NotFound("Widget settings not found");
+        //     }
+
+        //     // ตรวจสอบว่า settings เป็น string ที่เป็น JSON หรือไม่
+        //     return Ok(settings.settings); // ส่งกลับเป็น string ที่เป็น JSON
+        // }
+        [Authorize]
+        [HttpGet("get-widget-settings")]
+        public IActionResult GetMyWidget()
         {
-            var settings = _context.Widget.FirstOrDefault(ws => ws.user_id == user_id);
+            var userId = int.Parse(User.FindFirst("user_id").Value);
+
+            var settings = _context.Widget.FirstOrDefault(ws => ws.user_id == userId);
 
             if (settings == null)
             {
                 return NotFound("Widget settings not found");
             }
 
-            // ตรวจสอบว่า settings เป็น string ที่เป็น JSON หรือไม่
-            return Ok(settings.settings); // ส่งกลับเป็น string ที่เป็น JSON
+            return Ok(settings.settings);
         }
 
-        [HttpGet("get-user-id")]
-        public IActionResult GetUserIdByEmail(string email)
-        {
-            // ค้นหาผู้ใช้จากอีเมล
-            var admin = _context.Admin.FirstOrDefault(a => a.Email == email);
-            if (admin == null)
-            {
-                return NotFound("User not found");
-            }
+        // [HttpGet("get-user-id")]
+        // public IActionResult GetUserIdByEmail(string email)
+        // {
+        //     // ค้นหาผู้ใช้จากอีเมล
+        //     var admin = _context.Admin.FirstOrDefault(a => a.Email == email);
+        //     if (admin == null)
+        //     {
+        //         return NotFound("User not found");
+        //     }
 
-            // ส่งค่า user_id ที่ตรงกับ admin โดยใช้ email
-            return Ok(new { user_id = admin.user_id }); // ถ้าใช้ user_id ในฐานข้อมูล
-        }
+        //     // ส่งค่า user_id ที่ตรงกับ admin โดยใช้ email
+        //     return Ok(new { user_id = admin.user_id }); // ถ้าใช้ user_id ในฐานข้อมูล
+        // }
     }
 }

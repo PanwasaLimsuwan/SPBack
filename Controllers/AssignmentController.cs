@@ -30,10 +30,10 @@ namespace Api.Controllers
         }
 
         private static DateTime ThaiNow =>
-    TimeZoneInfo.ConvertTimeFromUtc(
-        DateTime.UtcNow,
-        TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")
-    );
+            TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")
+            );
 
         // GET: api/Assignment
         [HttpGet]
@@ -45,6 +45,8 @@ namespace Api.Controllers
         {
             try
             {
+                await AutoCloseAssignments(); // ✅ ตรงนี้
+
                 var results = new List<object>();
                 using var conn = new SqlConnection(_connectionString);
                 await conn.OpenAsync();
@@ -966,6 +968,35 @@ WHERE a.Role IN ('LeaderMFG','LeaderHR','Admin')
             });
 
             return Ok(new { message = "Return confirmed. Completed.", assignmentID = id });
+        }
+
+        private async Task AutoCloseAssignments()
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var cmd = new SqlCommand(
+                @"
+UPDATE A
+SET A.Status = 'Completed',
+    A.EndAt = T.Timestamp
+FROM Assignment A
+OUTER APPLY (
+    SELECT TOP 1 T.Timestamp, T.CameraID
+    FROM Transactions T
+    WHERE T.EmpID = A.EmpID
+      AND CAST(T.Timestamp AS DATE) = CAST(GETDATE() AS DATE)
+    ORDER BY T.Timestamp DESC  -- ✅ เอาล่าสุดก่อน
+) T
+WHERE A.Status = 'Active'
+  AND T.CameraID = 1           -- ✅ ล่าสุดต้องเป็น CameraID=1 ด้วย
+  AND T.Timestamp IS NOT NULL
+  AND DATEDIFF(MINUTE, T.Timestamp, GETDATE()) >= 30  -- ✅ ป้องกันออกแป๊บแล้วกลับ
+",
+                conn
+            );
+
+            await cmd.ExecuteNonQueryAsync();
         }
 
         // ─── DTOs ───────────────────────────────────────────────────

@@ -1,29 +1,35 @@
-using Microsoft.EntityFrameworkCore;
-using Api.Models;
-using Api.Jobs;
-using Api.Services;
+using System.Text;
 using Api.Hubs;
+using Api.Jobs;
+using Api.Models;
+using Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Enable CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowLocalhost",
+    options.AddPolicy(
+        "AllowLocalhost",
         policy =>
         {
             // policy.WithOrigins("http://localhost:8080") // แหล่งที่มาที่จะอนุญาต
-            policy.SetIsOriginAllowed(_ => true) 
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        });
+            policy
+                .SetIsOriginAllowed(_ => true)
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials();
+        }
+    );
 });
 
 // ลงทะเบียน ApplicationDbContext โดยใช้ SQL Server (หรือฐานข้อมูลที่คุณใช้งาน)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+);
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -32,6 +38,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient(); // สำหรับ BackgroundService ใช้เรียก API
+
 // builder.Services.AddHostedService<GateToWorktimeJob>(); // ลงทะเบียน background job
 // builder.Services.AddHostedService<WorktimeJob>();
 // builder.Services.AddHostedService<CalculatedOTJob>();
@@ -39,6 +46,7 @@ builder.Services.AddHttpClient(); // สำหรับ BackgroundService ใช
 // builder.Services.AddHostedService<CalculatedAttendanceJob>();
 // builder.Services.AddSingleton<AnalyticsRepository>();
 builder.Services.AddScoped<AnalyticsRepository>(); // 👈 เพิ่มบรรทัดนี้
+
 // builder.Services.AddScoped<DataMigrationService>();
 
 builder.Services.AddSignalR();
@@ -49,6 +57,7 @@ builder.Services.AddScoped<CleanroomEntryService>();
 builder.Services.AddScoped<AttendanceService>();
 builder.Services.AddScoped<ManpowerPlanService>();
 builder.Services.AddScoped<ManpowerReqService>();
+
 // builder.Services.AddScoped<DailySimulationService>();
 
 builder.Services.AddSingleton<TransactionSimulatorService>();
@@ -56,10 +65,32 @@ builder.Services.AddHostedService(p => p.GetRequiredService<TransactionSimulator
 
 builder.Services.AddHostedService<AttendanceJob>();
 builder.Services.AddHostedService<WorktimeJob>();
+
 // builder.Services.AddHostedService<OTJob>();
 builder.Services.AddHostedService<CleanroomEntryJob>();
 builder.Services.AddHostedService<ManpowerPlanJob>();
 builder.Services.AddHostedService<ManpowerReqJob>();
+
+builder
+    .Services.AddAuthentication("Bearer")
+    .AddJwtBearer(
+        "Bearer",
+        options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])
+                ),
+            };
+        }
+    );
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -134,13 +165,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(); // Add this line to enable Swagger UI
 }
 
-// ลบบรรทัดซ้ำออก และเรียงใหม่เป็น:
-app.UseDefaultFiles();      // ← ต้องมาก่อน
-app.UseStaticFiles();       // ← ต้องมาก่อน
 app.UseCors("AllowLocalhost");
+app.UseAuthentication(); // 🔥 ต้องมาก่อน
+app.UseAuthorization();
+app.UseDefaultFiles(); // ← ต้องมาก่อน
+app.UseStaticFiles(); // ← ต้องมาก่อน
 app.UseHttpsRedirection();
 app.MapHub<AttendanceHub>("/attendanceHub");
 app.MapHub<NotificationHub>("/notificationHub");
 app.MapControllers();
-app.MapFallbackToFile("index.html");  // ← ต้องมาหลังสุด
+app.MapFallbackToFile("index.html"); // ← ต้องมาหลังสุด
 app.Run();

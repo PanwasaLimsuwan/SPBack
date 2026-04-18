@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Api.Models;
 using BCrypt.Net;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -291,33 +292,33 @@ namespace API_ProductionQuality.Controllers
         //     }
         // }
         [HttpPost("register-leader")]
-        public async Task<IActionResult> RegisterNewEmployeeForLeader([FromBody] Admin admin)
+        public async Task<IActionResult> RegisterNewEmployeeForLeader(
+            [FromBody] AdminRegisterDto dto
+        )
         {
-            if (admin == null)
+            if (dto == null)
                 return BadRequest("Invalid data.");
 
-            if (string.IsNullOrEmpty(admin.Email) || string.IsNullOrEmpty(admin.PasswordHash))
-            {
+            if (string.IsNullOrEmpty(dto.Email) || string.IsNullOrEmpty(dto.Password))
                 return BadRequest("Email or Password is missing.");
-            }
 
-            var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a =>
-                a.EmpID == admin.EmpID
-            );
+            var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == dto.EmpID);
+
             if (existingAdmin != null)
                 return Conflict("Admin already exists.");
 
-            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
+            // 🔥 hash จาก Password
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
-            // ✅ ใช้ Role ที่ส่งมาจาก Frontend (LeaderMFG หรือ LeaderHR)
             var newAdmin = new Admin
             {
-                EmpID = admin.EmpID,
-                FirstName = admin.FirstName,
-                LastName = admin.LastName,
-                Email = admin.Email,
+                EmpID = dto.EmpID,
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                Email = dto.Email,
                 PasswordHash = hashedPassword,
-                Role = admin.Role, // ✅ ใช้ Role ที่ส่งมา ไม่ใช่ค่าคงที่ "Leader"
+                Role = dto.Role, // LeaderMFG / LeaderHR
+                MustChangePassword = true, // 🔥 สำคัญ
             };
 
             try
@@ -325,9 +326,9 @@ namespace API_ProductionQuality.Controllers
                 _context.Admin.Add(newAdmin);
                 await _context.SaveChangesAsync();
 
-                SendVerificationEmail(newAdmin, admin.PasswordHash);
+                SendVerificationEmail(newAdmin, dto.Password);
 
-                return Ok(new { Message = $"ลงทะเบียนพนักงานสำเร็จ {admin.Role}." });
+                return Ok(new { Message = $"ลงทะเบียนพนักงานสำเร็จ {dto.Role}." });
             }
             catch (DbUpdateException dbEx)
             {
@@ -342,48 +343,43 @@ namespace API_ProductionQuality.Controllers
         }
 
         [HttpPost("register-admin")]
-        public async Task<IActionResult> RegisterNewEmployeeForAdmin([FromBody] Admin admin)
+        public async Task<IActionResult> RegisterNewEmployeeForAdmin(
+            [FromBody] AdminRegisterDto dto
+        )
         {
-            if (admin == null)
+            if (dto == null)
                 return BadRequest("Invalid data.");
 
-            // ตรวจสอบข้อมูลที่สำคัญ (เช่น Email, Password)
-            if (string.IsNullOrEmpty(admin.Email) || string.IsNullOrEmpty(admin.PasswordHash))
-            {
+            if (string.IsNullOrEmpty(dto.Email) || string.IsNullOrEmpty(dto.Password))
                 return BadRequest("Email or Password is missing.");
-            }
 
-            // เช็คว่า admin มีอยู่ในระบบหรือไม่
-            var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a =>
-                a.EmpID == admin.EmpID
-            );
+            var existingAdmin = await _context.Admin.FirstOrDefaultAsync(a => a.EmpID == dto.EmpID);
+
             if (existingAdmin != null)
                 return Conflict("Admin already exists.");
 
-            // แปลงรหัสผ่านเป็น Hash
-            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(admin.PasswordHash);
+            // 🔥 hash จาก Password (ไม่ใช่ PasswordHash)
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
-            // สร้าง Admin ใหม่
             var newAdmin = new Admin
             {
-                EmpID = admin.EmpID,
-                FirstName = admin.FirstName,
-                LastName = admin.LastName,
-                Email = admin.Email,
-                PasswordHash = hashedPassword,
-                Role = "Admin", // Set default role
+                EmpID = dto.EmpID,
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                Email = dto.Email,
+                PasswordHash = hashedPassword, // ✅ เก็บ hash
+                Role = dto.Role ?? "Admin",
+                MustChangePassword = true, // 🔥 สำคัญ
             };
 
             try
             {
-                // เพิ่ม Admin ลงในฐานข้อมูล
                 _context.Admin.Add(newAdmin);
                 await _context.SaveChangesAsync();
 
-                // ส่งอีเมลแจ้งเตือนหลังจากการลงทะเบียน
-                SendVerificationEmail(newAdmin, admin.PasswordHash);
+                // ⚠️ ส่ง plaintext ไป email (โอเคใน use case นี้)
+                SendVerificationEmail(newAdmin, dto.Password);
 
-                // return Ok(new { Message = "Admin registered successfully." });
                 return Ok("ลงทะเบียนพนักงานสำเร็จ");
             }
             catch (DbUpdateException dbEx)
@@ -396,6 +392,38 @@ namespace API_ProductionQuality.Controllers
                 Console.WriteLine("Error during registration: " + ex.Message);
                 return StatusCode(500, "Internal server error");
             }
+        }
+
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.NewPassword))
+                return BadRequest("Password required");
+
+            var userId = User.FindFirst("user_id")?.Value;
+            if (userId == null)
+                return Unauthorized();
+
+            var admin = await _context.Admin.FindAsync(int.Parse(userId));
+            if (admin == null)
+                return NotFound();
+
+            // 🔥 hash password ใหม่
+            // admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+
+            admin.PasswordHash = hashedPassword;
+            admin.MustChangePassword = false;
+
+            await _context.SaveChangesAsync();
+
+            // 🔥 ปิด flag
+            admin.MustChangePassword = false;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password changed" });
         }
 
         // [HttpPost("register-admin")]
@@ -556,6 +584,9 @@ namespace API_ProductionQuality.Controllers
                         role = admin.Role,
                         biz = employee?.Biz ?? "",
                         process = employee?.Process ?? "",
+
+                        // 🔥🔥🔥 เพิ่มบรรทัดนี้
+                        mustChangePassword = admin.MustChangePassword,
                     }
                 );
             }
@@ -752,9 +783,9 @@ namespace API_ProductionQuality.Controllers
                     //     "Best regards,\nMFG Dashboard",
                     plainTextContent: $"คุณ {admin.FirstName} {admin.LastName},\n\n"
                         + "ระบบได้ทำการสร้างบัญชีผู้ใช้งานของคุณเรียบร้อยแล้ว\n"
-                        + $"รหัสผ่านของคุณคือ {userPassword}\n\n",
-                        // + "⚠️ กรุณาเปลี่ยนรหัสผ่านทันทีหลังจากเข้าสู่ระบบครั้งแรก\n\n"
-                        // + "ขอแสดงความนับถือ\nMFG Dashboard",
+                        + $"รหัสผ่านของคุณคือ {userPassword}\n\n"
+                    + "⚠️ กรุณาเปลี่ยนรหัสผ่านทันทีหลังจากเข้าสู่ระบบครั้งแรก\n\n",
+                    // + "ขอแสดงความนับถือ\nMFG Dashboard",
                     htmlContent: null
                 );
 
@@ -783,6 +814,7 @@ namespace API_ProductionQuality.Controllers
             {
                 new Claim(JwtRegisteredClaimNames.Sub, admin.Email),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim("user_id", admin.user_id.ToString()),
                 new Claim("role", admin.Role ?? ""),
                 // ✅ เพิ่ม 3 claims นี้
                 new Claim("empID", admin.EmpID.ToString()),

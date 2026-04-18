@@ -187,7 +187,8 @@ namespace Api.Services
             await conn.OpenAsync();
 
             // ✅ ขั้นที่ 1 — เช็คว่ามี transaction ของ workdate นี้ไหม
-            var checkCmd = new SqlCommand(@"
+            var checkCmd = new SqlCommand(
+                @"
                 DECLARE @WorkDate DATE = CASE
                     WHEN CAST(GETDATE() AS TIME) < '07:00:00'
                     THEN CAST(DATEADD(DAY, -1, GETDATE()) AS DATE)
@@ -203,7 +204,9 @@ namespace Api.Services
                 WHERE CAST(t.Timestamp AS DATE) >= @WorkDate
                   AND t.EmpID IS NOT NULL
                   AND t.CameraID = 1
-            ", conn);
+            ",
+                conn
+            );
             checkCmd.CommandTimeout = 10;
             var count = (int)await checkCmd.ExecuteScalarAsync();
             if (count == 0)
@@ -213,7 +216,8 @@ namespace Api.Services
             using var transaction = conn.BeginTransaction();
             try
             {
-                var cmd = new SqlCommand(@"
+                var cmd = new SqlCommand(
+                    @"
                     DECLARE @WorkDate DATE = CASE
                         WHEN CAST(GETDATE() AS TIME) < '07:00:00'
                         THEN CAST(DATEADD(DAY, -1, GETDATE()) AS DATE)
@@ -296,14 +300,18 @@ namespace Api.Services
                         FROM FullDayTx
                     ),
                     Final AS (
-                        SELECT
-                            EmpID, WorkDate,
-                            MIN(CASE WHEN CameraID = 1 THEN Timestamp END) AS CheckInTime,
-                            MAX(CASE WHEN CameraID = 1 THEN Timestamp END) AS CheckOutTime,
-                            MAX(Shift) AS Shift
-                        FROM Dedup WHERE rn = 1
-                        GROUP BY EmpID, WorkDate
-                    ),
+    SELECT
+        EmpID, WorkDate,
+        MIN(CASE WHEN CameraID = 1 THEN Timestamp END) AS CheckInTime,
+        MAX(CASE 
+            WHEN CameraID = 1 
+            AND DATEDIFF(MINUTE, Timestamp, GETDATE()) >= 30  -- ✅ เพิ่มตรงนี้
+            THEN Timestamp 
+        END) AS CheckOutTime,
+        MAX(Shift) AS Shift
+    FROM Dedup WHERE rn = 1
+    GROUP BY EmpID, WorkDate
+),
                     FinalCleaned AS (
                         SELECT
                             EmpID, WorkDate, CheckInTime, Shift,
@@ -397,7 +405,10 @@ namespace Api.Services
                                 ELSE 'Missing Checkout'
                             END
                         );
-                ", conn, transaction);
+                ",
+                    conn,
+                    transaction
+                );
 
                 cmd.CommandTimeout = 60;
                 await cmd.ExecuteNonQueryAsync();
@@ -409,6 +420,15 @@ namespace Api.Services
                 await transaction.RollbackAsync();
                 throw;
             }
+            // Final AS (
+            //             SELECT
+            //                 EmpID, WorkDate,
+            //                 MIN(CASE WHEN CameraID = 1 THEN Timestamp END) AS CheckInTime,
+            //                 MAX(CASE WHEN CameraID = 1 THEN Timestamp END) AS CheckOutTime,
+            //                 MAX(Shift) AS Shift
+            //             FROM Dedup WHERE rn = 1
+            //             GROUP BY EmpID, WorkDate
+            //         ),
         }
     }
 }

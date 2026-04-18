@@ -274,9 +274,18 @@ public class TransactionSimulatorService : BackgroundService
         if (existing.Contains(key))
             return;
 
+        // ✅ เปลี่ยนแค่ตรงนี้
         var sql =
-            @"INSERT INTO Transactions (EmpID, Timestamp, CameraID) 
-                    VALUES (@empID, @ts, @cam)";
+            @"
+        IF NOT EXISTS (
+            SELECT 1 FROM Transactions 
+            WHERE EmpID = @empID 
+              AND Timestamp = @ts 
+              AND CameraID = @cam
+        )
+        INSERT INTO Transactions (EmpID, Timestamp, CameraID) 
+        VALUES (@empID, @ts, @cam)";
+
         using var cmd = new SqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@empID", empID);
         cmd.Parameters.AddWithValue("@ts", timestamp);
